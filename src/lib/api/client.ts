@@ -5,7 +5,8 @@ export type ApiResponse<T> = Readonly<{
   [key: string]: any;
 }>;
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+// Defaults to the same-origin proxy (src/app/api/[...path]/route.ts), which forwards to BACKEND_URL at runtime.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const getToken = (): string | null => {
   if (typeof window === "undefined") return null;
