@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Field, Form, Formik } from "formik";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import * as Yup from "yup";
 import { createColumnHelper } from "@tanstack/react-table";
 import { AlertTriangle, Edit3, Eye, Plus, Trash2, Sparkles } from "lucide-react";
@@ -203,7 +204,9 @@ const testSchema = Yup.object({
   status: Yup.string().required("Please select catalog status").oneOf(["Active", "Inactive"], "Invalid status"),
 });
 
-export function LabManager({ kind, path }: Readonly<{ kind: Kind; path: readonly string[] }>) {
+export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path?: readonly string[] }>) {
+  const routePath = useCatchAllPath();
+  const path = pathProp ?? routePath;
   const router = useRouter();
   const [currentRole, setCurrentRole] = useState<UserRole | undefined>(undefined);
   const [currentSession, setCurrentSession] = useState<{ role?: UserRole; franchiseId?: string; id?: string } | null>(null);

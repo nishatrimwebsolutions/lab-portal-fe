@@ -1,2 +1,8 @@
 import { OperationsManager } from "@/components/operations/operations-manager";
-export default async function Page({ params }: Readonly<{ params: Promise<{ path?: string[] }> }>) { const { path } = await params; return <OperationsManager kind="appointments" path={path ?? []}/>; }
+
+// The section reads its sub-path from the URL (useCatchAllPath), so only the section root is pre-rendered.
+export const generateStaticParams = () => [{ path: [] }];
+
+export default function AppointmentsPage() {
+  return <OperationsManager kind="appointments" />;
+}

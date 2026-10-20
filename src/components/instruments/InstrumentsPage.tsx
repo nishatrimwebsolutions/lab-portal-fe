@@ -5,6 +5,7 @@ import { Field, Form, Formik } from "formik";
 import * as Yup from "yup";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import { format } from "date-fns";
 import {
   Activity, AlertCircle, ArrowLeftRight, Cpu, Download, Pencil, Plus, Power, RefreshCw, Settings2, Share2, Trash2, UploadCloud, Wifi, WifiOff
@@ -186,7 +187,9 @@ function AnalyzerStatusCard({ instrumentId, instrumentName, status }: Readonly<{
   );
 }
 
-export function InstrumentsPage({ path }: Readonly<{ path: readonly string[] }>) {
+export function InstrumentsPage({ path: pathProp }: Readonly<{ path?: readonly string[] }>) {
+  const routePath = useCatchAllPath();
+  const path = pathProp ?? routePath;
   const router = useRouter();
   const mutations = useInstrumentMutations();
   const [view, setView] = useState<"list" | "cards">("cards");

@@ -1,6 +1,8 @@
 import { EntityManager } from "@/components/forms/entity-manager";
 
-export default async function TechniciansPage({ params }: Readonly<{ params: Promise<{ path?: string[] }> }>) {
-  const { path } = await params;
-  return <EntityManager kind="technicians" path={path ?? []} />;
+// The section reads its sub-path from the URL (useCatchAllPath), so only the section root is pre-rendered.
+export const generateStaticParams = () => [{ path: [] }];
+
+export default function TechniciansPage() {
+  return <EntityManager kind="technicians" />;
 }

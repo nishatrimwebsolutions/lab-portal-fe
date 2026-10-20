@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Field, Form, Formik, type FormikHelpers } from "formik";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import * as Yup from "yup";
 import { createColumnHelper } from "@tanstack/react-table";
 import { AlertTriangle, Edit3, Trash2, Eye, Plus, Building2, IndianRupee } from "lucide-react";
@@ -590,7 +591,9 @@ const configs = {
   users: { singular: "User", plural: "Users", fields: userFields },
 } as const;
 
-export function EntityManager({ kind, path }: Readonly<{ kind: Kind; path: readonly string[] }>) {
+export function EntityManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path?: readonly string[] }>) {
+  const routePath = useCatchAllPath();
+  const path = pathProp ?? routePath;
   const config = configs[kind];
   const router = useRouter();
   const searchParams = useSearchParams();

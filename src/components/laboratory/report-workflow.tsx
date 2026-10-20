@@ -4,6 +4,7 @@ import { Form, Formik, Field } from "formik";
 import * as Yup from "yup";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import {
   AlertTriangle, Award, Calendar, CheckCircle2, ChevronRight, Clock, Download,
   Edit3, Eye, FileText, FlaskConical, Mail, MessageCircle, Microscope,
@@ -61,7 +62,9 @@ const templateSchema = Yup.object({
   notes: Yup.string().trim(),
 });
 
-export function ReportWorkflow({ path }: Readonly<{ path: readonly string[] }>) {
+export function ReportWorkflow({ path: pathProp }: Readonly<{ path?: readonly string[] }>) {
+  const routePath = useCatchAllPath();
+  const path = pathProp ?? routePath;
   const router = useRouter();
   const reports = useReports();
   const templates = useReportTemplates();

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Field, Form, Formik } from "formik";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import * as Yup from "yup";
 import { Printer, ArrowLeft, Eye, Edit3, Trash2, Plus, AlertTriangle, Sparkles, FlaskConical, Receipt, FileText, CheckCircle2, X, Calendar, Phone, Mail } from "lucide-react";
 import { PageHeader, StatusBadge, Button, Input, Select, Field as UIField, Grid2, Card, cn, SearchableCombobox, ComboboxOption } from "@/components/ui/index";
@@ -551,7 +552,9 @@ function InvoicePrintView({
   );
 }
 
-export function OperationsManager({ kind, path }: Readonly<{ kind: "appointments" | "billing"; path: readonly string[] }>) {
+export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "appointments" | "billing"; path?: readonly string[] }>) {
+  const routePath = useCatchAllPath();
+  const path = pathProp ?? routePath;
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlPatientId = searchParams?.get("patientId") || searchParams?.get("patient") || "";
