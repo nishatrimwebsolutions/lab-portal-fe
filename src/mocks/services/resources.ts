@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client";
-import type { Doctor, DoctorLedgerReport, DoctorPaymentInput, Franchise, Patient, Report, ReportTemplate, Result, Sample, Supplier, Test, TestMaster, User } from "@/types/domain";
+import type { Doctor, DoctorLedgerReport, DoctorPaymentInput, InterpretationRule, Franchise, Patient, Report, ReportTemplate, Result, Sample, Supplier, Test, TestMaster, User } from "@/types/domain";
 
 const apiCrud = <T extends { id: string }>(resource: string) => ({
   list: (params?: Record<string, any>) => apiClient.get<T[]>(`/${resource}`, params),
@@ -19,6 +19,19 @@ export const doctorApi = {
     }),
   addPayment: (id: string, input: DoctorPaymentInput) => apiClient.post<unknown>(`/doctors/${id}/payments`, input),
   deletePayment: (id: string, paymentId: string) => apiClient.delete<void>(`/doctors/${id}/payments/${paymentId}`),
+};
+export const interpretationRuleApi = {
+  list: (params?: { status?: string; search?: string; franchiseId?: string }) =>
+    apiClient.get<InterpretationRule[]>("/interpretation-rules", {
+      status: params?.status || undefined,
+      search: params?.search || undefined,
+      franchiseId: params?.franchiseId && params.franchiseId !== "all" ? params.franchiseId : undefined,
+    }),
+  create: (input: Partial<InterpretationRule>) => apiClient.post<InterpretationRule>("/interpretation-rules", input),
+  update: (id: string, input: Partial<InterpretationRule>) => apiClient.put<InterpretationRule>(`/interpretation-rules/${id}`, input),
+  approve: (id: string) => apiClient.post<InterpretationRule>(`/interpretation-rules/${id}/approve`, {}),
+  deactivate: (id: string) => apiClient.post<InterpretationRule>(`/interpretation-rules/${id}/deactivate`, {}),
+  delete: (id: string) => apiClient.delete<void>(`/interpretation-rules/${id}`),
 };
 export const franchiseApi = apiCrud<Franchise>("franchises");
 export const userApi = apiCrud<User>("users");

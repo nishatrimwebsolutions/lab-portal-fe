@@ -44,6 +44,7 @@ export const NAVIGATION: readonly NavGroup[] = [
     items: [
       { label: "Test Results", href: "/results", icon: "FileBarChart", roles: REPORT_ROLES },
       { label: "Reports Workflow", href: "/reports", icon: "ReceiptText", roles: ["Administrator", "Admin", "Pathologist", "Doctor", "Technician", "Franchise"] },
+      { label: "Interpretation Rules", href: "/interpretation-rules", icon: "ShieldCheck", roles: ["Administrator", "Admin", "Pathologist", "Technician", "Franchise"] },
     ],
   },
   {

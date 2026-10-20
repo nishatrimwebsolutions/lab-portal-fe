@@ -175,7 +175,43 @@ export interface Result {
   referenceRange: string;
   abnormalFlag: boolean;
   criticalFlag: boolean;
+  flag?: string | null;
+  interpretation?: string | null;
   comments?: string;
+}
+
+export interface InterpretationRule {
+  id: string;
+  parameterKey: string;
+  parameterName: string;
+  aliases: string[];
+  testName?: string | null;
+  franchiseId?: string | null;
+  franchise?: { id: string; name: string } | null;
+  gender: "Both" | "Male" | "Female";
+  ageMinYears?: number | null;
+  ageMaxYears?: number | null;
+  unit?: string | null;
+  resultType: "Numeric" | "Qualitative";
+  normalMin?: number | null;
+  normalMax?: number | null;
+  criticalLow?: number | null;
+  criticalHigh?: number | null;
+  lowText?: string | null;
+  normalText?: string | null;
+  highText?: string | null;
+  criticalText?: string | null;
+  bands?: { above?: number | null; upTo?: number | null; flag: string; label?: string | null; text?: string | null }[] | null;
+  outcomes?: { values: string[]; flag: string; label?: string | null; text?: string | null }[] | null;
+  referenceRangeText?: string | null;
+  status: "Draft" | "Approved" | "Inactive";
+  version: number;
+  notes?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  updatedAt?: string;
 }
 
 export interface Report {

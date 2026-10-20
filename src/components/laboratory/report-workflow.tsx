@@ -1153,6 +1153,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
                       <td className={cn("py-0.5 px-2", isSubItem && "pl-4")}>
                         <p className="font-bold text-slate-900 text-[12px] leading-tight">{r.parameter}</p>
                         {r.comments && <p className="text-[10px] text-slate-500 italic leading-none">{r.comments}</p>}
+                        {r.interpretation && <p className="text-[10px] text-slate-700 leading-tight">{r.interpretation}</p>}
                       </td>
                       <td
                         className="py-0.5 px-2 text-right font-mono text-[12.5px] text-slate-900"
@@ -1161,6 +1162,11 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
                         }}
                       >
                         {r.value}
+                        {r.value && (r.flag === "High" || r.flag === "Critical High" || r.flag === "Low" || r.flag === "Critical Low") && (
+                          <span className="ml-1 text-[10px] font-bold" title={r.flag}>
+                            {r.flag.endsWith("High") ? "H" : "L"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-0.5 px-2 font-mono font-medium text-slate-700 text-[11px]">
                         {r.unit || "—"}

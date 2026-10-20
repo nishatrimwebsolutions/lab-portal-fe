@@ -28,6 +28,8 @@ import { SubParameterSelect } from "@/components/laboratory/SubParameterSelect";
 import { resolveClinicalNotesConfig } from "@/lib/laboratory/letterhead-registry";
 import { formatPatientAgeLabel } from "@/lib/patient-age";
 import { useFranchise } from "@/lib/context/franchise-context";
+import { useInterpretationRules } from "@/features/interpretation/hooks";
+import { interpretResult, patientAgeYears, type InterpretationResult } from "@/lib/laboratory/interpretation-engine";
 import type { Patient, Sample, Doctor, TestMaster } from "@/types/domain";
 
 interface PrescribedTestItem {
@@ -328,6 +330,18 @@ export function ReportGeneratorWizard() {
     return getTestParameterSchema(lookupKey || testKey, selectedSubParams, activeFranchiseId);
   }, [selectedTestName, customTestName, testSubParamsMap, activeFranchiseId, testMastersQuery.data]);
 
+  // Approved interpretation rules (live preview; the backend re-evaluates authoritatively on save)
+  const patientFranchiseId =
+    currentPatient?.franchiseId || (currentPatient as { franchise?: { id?: string } } | null | undefined)?.franchise?.id || undefined;
+  const { data: approvedRules = [] } = useInterpretationRules({ status: "Approved", franchiseId: patientFranchiseId }, Boolean(currentPatient));
+  const patientAge = useMemo(() => patientAgeYears(currentPatient), [currentPatient]);
+  const interpretParam = (param: ParameterDefinition, value: string, unit: string): InterpretationResult | null =>
+    interpretResult(
+      approvedRules,
+      { parameterId: param.id, parameterName: param.name, unit, sex: currentPatient?.sex, ageYears: patientAge, franchiseId: patientFranchiseId },
+      value
+    );
+
   // Parameter values state
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramUnits, setParamUnits] = useState<Record<string, string>>({});
@@ -408,13 +422,17 @@ export function ReportGeneratorWizard() {
             ? { ...param, ...ggtLimitsForPatient(currentPatient) }
             : param;
         const evalResult = evaluateParameterFlag(value, evalParam);
+        const unit = paramUnits[param.id] ?? param.unit ?? "";
+        const interp = interpretParam(param, value, unit);
         return {
+          parameterId: param.id,
           parameter: param.name,
           value,
-          unit: paramUnits[param.id] ?? param.unit ?? "",
+          unit,
           referenceRange: paramRanges[param.id] ?? param.referenceRange ?? "",
-          abnormalFlag: evalResult.isAbnormal,
-          criticalFlag: evalResult.isCritical,
+          abnormalFlag: interp ? interp.isAbnormal : evalResult.isAbnormal,
+          criticalFlag: interp ? interp.isCritical : evalResult.isCritical,
+          flag: interp ? interp.flag : value.trim() ? evalResult.flag : undefined,
           comments: param.method ? `Method: ${param.method}` : undefined,
         };
       });
@@ -887,7 +905,11 @@ export function ReportGeneratorWizard() {
                       : param.id === "ggt"
                       ? { ...param, ...ggtLimitsForPatient(currentPatient) }
                       : param;
-                  const evalResult = evaluateParameterFlag(val, evalParam);
+                  const baseEval = evaluateParameterFlag(val, evalParam);
+                  const interp = interpretParam(param, val, unitVal);
+                  const evalResult = interp
+                    ? { ...baseEval, isAbnormal: interp.isAbnormal, isCritical: interp.isCritical }
+                    : baseEval;
 
                   return (
                     <tr 
@@ -938,6 +960,19 @@ export function ReportGeneratorWizard() {
                               evalResult.isAbnormal && !evalResult.isCritical && "border-amber-500"
                             )}
                           />
+                        )}
+                        {val.trim() && (interp || baseEval.flag !== "Normal") && (
+                          <div className="mt-1 space-y-0.5">
+                            <StatusBadge
+                              tone={evalResult.isCritical ? "danger" : evalResult.isAbnormal ? "warning" : "success"}
+                              size="sm"
+                            >
+                              {interp ? interp.label : baseEval.flag}
+                            </StatusBadge>
+                            {interp?.interpretation && (
+                              <p className="text-[10px] leading-snug text-[color:var(--muted)] max-w-[11rem]">{interp.interpretation}</p>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="py-2.5 px-4">
