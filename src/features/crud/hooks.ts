@@ -95,3 +95,19 @@ export function useDoctorLedger(id: string, startDate?: string, endDate?: string
     enabled: Boolean(id && id !== "new"),
   });
 }
+
+export function useCreateDoctorPayment(doctorId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: import("@/types/domain").DoctorPaymentInput) => doctorApi.addPayment(doctorId, input),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.doctors.all }),
+  });
+}
+
+export function useDeleteDoctorPayment(doctorId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => doctorApi.deletePayment(doctorId, paymentId),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.doctors.all }),
+  });
+}

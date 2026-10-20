@@ -687,5 +687,70 @@ export interface DoctorLedgerReport {
   dateWiseBreakdown: DoctorLedgerDateBreakdown[];
   invoices: DoctorLedgerInvoiceItem[];
   patients?: DoctorLedgerPatientItem[];
+  ledger?: DoctorAccountLedger;
+}
+
+export interface DoctorAccountLedgerEntry {
+  id: string;
+  type: "Bill" | "Payment";
+  date: string;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  paymentMode?: string | null;
+  createdAt: string;
+}
+
+export interface DoctorAccountLedger {
+  openingBalance: number;
+  totalBilled: number;
+  totalReceived: number;
+  closingBalance: number;
+  currentOutstanding: number;
+  entries: DoctorAccountLedgerEntry[];
+}
+
+export interface DoctorPaymentInput {
+  paymentDate: string;
+  amount: number;
+  paymentMode?: string;
+  referenceNo?: string;
+  notes?: string;
+}
+
+export interface TestWiseReportRecord {
+  invoiceId: string;
+  billNumber: string;
+  date: string;
+  patientId: string;
+  patientName: string;
+  patientCode: string;
+  doctorName: string;
+  franchiseName: string;
+  testCode: string;
+  testName: string;
+  quantity: number;
+  rate: number;
+  grossAmount: number;
+  netAmount: number;
+  paymentStatus: string;
+}
+
+export interface TestWiseReport {
+  test: { code: string; name: string };
+  dateRange: { startDate: string | null; endDate: string | null };
+  summary: {
+    totalTests: number;
+    totalGross: number;
+    totalNet: number;
+    totalDiscount: number;
+    invoiceCount: number;
+    uniquePatients: number;
+    activeDays: number;
+  };
+  dateWiseBreakdown: { date: string; testCount: number; rates: number[]; grossAmount: number; netAmount: number }[];
+  records: TestWiseReportRecord[];
 }
 

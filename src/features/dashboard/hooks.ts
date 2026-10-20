@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "@/mocks/services/dashboard";
 import { queryKeys } from "@/lib/query/query-keys";
 import type { ApiResponse } from "@/lib/api/client";
-import type { Activity, ChartPoint, CriticalResult, DashboardStats, PendingWork, ProfitLossReport, MonthlySalesReport } from "@/types/domain";
+import type { Activity, ChartPoint, CriticalResult, DashboardStats, PendingWork, ProfitLossReport, MonthlySalesReport, TestWiseReport } from "@/types/domain";
 export const useDashboardStats = (franchiseId?: string) =>
   useQuery<ApiResponse<DashboardStats>, Error, DashboardStats>({
     queryKey: queryKeys.dashboard.stats(franchiseId),
@@ -79,6 +79,14 @@ export const useSalesReport = (startDate?: string, endDate?: string, franchiseId
     queryKey: queryKeys.dashboard.salesReport(startDate, endDate, franchiseId),
     queryFn: () => dashboardApi.getSalesReport(startDate, endDate, franchiseId),
     select: (response) => response.data,
+  });
+
+export const useTestWiseReport = (testCode: string, startDate?: string, endDate?: string, franchiseId?: string) =>
+  useQuery<ApiResponse<TestWiseReport>, Error, TestWiseReport>({
+    queryKey: queryKeys.dashboard.testWiseReport(testCode, startDate, endDate, franchiseId),
+    queryFn: () => dashboardApi.getTestWiseReport(testCode, startDate, endDate, franchiseId),
+    select: (response) => response.data,
+    enabled: Boolean(testCode),
   });
 
 

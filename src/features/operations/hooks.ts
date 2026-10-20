@@ -26,15 +26,22 @@ export const useUpdateAppointment = () => {
 };
 export const useDeleteAppointment = () => mutation<string>("appointments", appointmentApi.delete);
 
-export const useCreateInvoice = () => mutation<Omit<Invoice, "id">>("billing", billingApi.create);
-export const useUpdateInvoice = () => {
+// Bills feed the doctor ledger and test-wise report, so refresh those caches too.
+const useInvoiceMutation = <T,>(fn: (input: T) => Promise<unknown>) => {
   const c = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<Invoice> }) => billingApi.update(id, input),
-    onSuccess: () => c.invalidateQueries({ queryKey: ["billing"] }),
+    mutationFn: fn,
+    onSuccess: () => {
+      c.invalidateQueries({ queryKey: ["billing"] });
+      c.invalidateQueries({ queryKey: ["doctors"] });
+      c.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 };
-export const useDeleteInvoice = () => mutation<string>("billing", billingApi.delete);
+export const useCreateInvoice = () => useInvoiceMutation<Omit<Invoice, "id">>(billingApi.create);
+export const useUpdateInvoice = () =>
+  useInvoiceMutation(({ id, input }: { id: string; input: Partial<Invoice> }) => billingApi.update(id, input));
+export const useDeleteInvoice = () => useInvoiceMutation<string>(billingApi.delete);
 
 export const useCreateInventory = () => mutation<Omit<InventoryItem, "id">>("inventory", inventoryApi.create);
 export const useUpdateInventory = () => {

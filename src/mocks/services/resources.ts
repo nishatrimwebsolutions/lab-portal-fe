@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client";
-import type { Doctor, DoctorLedgerReport, Franchise, Patient, Report, ReportTemplate, Result, Sample, Supplier, Test, TestMaster, User } from "@/types/domain";
+import type { Doctor, DoctorLedgerReport, DoctorPaymentInput, Franchise, Patient, Report, ReportTemplate, Result, Sample, Supplier, Test, TestMaster, User } from "@/types/domain";
 
 const apiCrud = <T extends { id: string }>(resource: string) => ({
   list: (params?: Record<string, any>) => apiClient.get<T[]>(`/${resource}`, params),
@@ -17,6 +17,8 @@ export const doctorApi = {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     }),
+  addPayment: (id: string, input: DoctorPaymentInput) => apiClient.post<unknown>(`/doctors/${id}/payments`, input),
+  deletePayment: (id: string, paymentId: string) => apiClient.delete<void>(`/doctors/${id}/payments/${paymentId}`),
 };
 export const franchiseApi = apiCrud<Franchise>("franchises");
 export const userApi = apiCrud<User>("users");

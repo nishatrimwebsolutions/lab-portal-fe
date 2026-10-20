@@ -13,6 +13,7 @@ import { Card, Button, StatusBadge, cn } from "@/components/ui/index";
 import { useDoctorLedger } from "@/features/crud/hooks";
 import { useFranchise } from "@/lib/context/franchise-context";
 import type { DoctorLedgerInvoiceItem } from "@/types/domain";
+import { DoctorAccountLedgerPanel } from "@/components/doctors/DoctorAccountLedger";
 
 interface DoctorLedgerViewProps {
   doctorId: string;
@@ -45,7 +46,7 @@ export function DoctorLedgerView({
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [patientSearchTerm, setPatientSearchTerm] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"ledger" | "patients" | "profile">("ledger");
+  const [activeTab, setActiveTab] = useState<"account" | "ledger" | "patients" | "profile">("account");
 
   const { data: ledgerReport, isLoading, isFetching, refetch } = useDoctorLedger(
     doctorId,
@@ -144,6 +145,12 @@ export function DoctorLedgerView({
       }));
   }, [dateWiseBreakdown]);
 
+  const handleRangeChange = (start: string, end: string) => {
+    setStartDate(start);
+    setEndDate(end);
+    setActivePreset(start || end ? "custom" : "all_time");
+  };
+
   const handlePrint = () => {
     if (typeof window !== "undefined") {
       window.print();
@@ -230,13 +237,25 @@ export function DoctorLedgerView({
               </Button>
             </Link>
             <Button variant="outline" size="sm" leftIcon={<Printer size={14} />} onClick={handlePrint}>
-              Print Ledger
+              Print Page
             </Button>
           </div>
         </div>
 
         {/* View Tabs */}
         <div className="flex items-center gap-2 border-t border-[color:var(--line)] mt-5 pt-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("account")}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition",
+              activeTab === "account"
+                ? "bg-[#176b87] text-white shadow-xs"
+                : "text-[color:var(--muted)] hover:bg-slate-100"
+            )}
+          >
+            💳 Account Ledger (Dues & Payments)
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab("ledger")}
@@ -276,7 +295,16 @@ export function DoctorLedgerView({
         </div>
       </div>
 
-      {activeTab === "ledger" ? (
+      {activeTab === "account" ? (
+        <DoctorAccountLedgerPanel
+          doctor={doctor}
+          ledger={ledgerReport?.ledger}
+          startDate={startDate}
+          endDate={endDate}
+          onRangeChange={handleRangeChange}
+          isFetching={isFetching}
+        />
+      ) : activeTab === "ledger" ? (
         <Card className="border border-[color:var(--line)] shadow-sm overflow-hidden p-0">
           {/* 2. Date Range Filter Bar */}
           <div className="bg-[#0f172a] text-white px-5 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">

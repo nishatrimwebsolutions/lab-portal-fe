@@ -14,6 +14,7 @@ export const queryKeys = {
     criticalResults: (franchiseId?: string) => ["dashboard", "critical-results", franchiseId] as const,
     profitLoss: (year?: number, franchiseId?: string) => ["dashboard", "profit-loss", year, franchiseId] as const,
     salesReport: (startDate?: string, endDate?: string, franchiseId?: string) => ["dashboard", "sales-report", startDate, endDate, franchiseId] as const,
+    testWiseReport: (testCode?: string, startDate?: string, endDate?: string, franchiseId?: string) => ["dashboard", "test-wise-report", testCode, startDate, endDate, franchiseId] as const,
   },
   doctors: { 
     all: ["doctors"] as const, 

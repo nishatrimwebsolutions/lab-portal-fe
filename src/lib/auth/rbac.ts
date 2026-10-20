@@ -51,6 +51,7 @@ export const NAVIGATION: readonly NavGroup[] = [
     items: [
       { label: "Appointments", href: "/appointments", icon: "CalendarDays", roles: ["Administrator", "Admin", "Doctor", "Receptionist", "Franchise"] },
       { label: "Billing & Invoices", href: "/billing", icon: "IndianRupee", roles: ["Administrator", "Admin", "Doctor", "Receptionist", "Technician", "Franchise", "Billing"] },
+      { label: "Test-wise Report", href: "/test-reports", icon: "FileBarChart", roles: ["Administrator", "Admin", "Franchise", "Billing"] },
       { label: "Inventory Stock", href: "/inventory", icon: "Package", roles: ["Administrator", "Admin", "Franchise"] },
       { label: "Suppliers", href: "/suppliers", icon: "Package", roles: ADMIN },
     ],
