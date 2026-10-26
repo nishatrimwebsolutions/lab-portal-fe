@@ -443,6 +443,26 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     ]
   },
   {
+    code: "ES154",
+    name: "TYPHI DOT- IGG : SALMONELLA TYPHI",
+    department: "Serology",
+    sampleType: "Serum",
+    standardPrice: 400,
+    parameters: [
+      { id: "typhidot_igg", name: "TYPHI DOT IgG (Salmonella typhi)", unit: "", referenceRange: "NEGATIVE", method: "", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+    ],
+  },
+  {
+    code: "ES155",
+    name: "TYPHI DOT- IGM: SALMONELLA TYPHI",
+    department: "Serology",
+    sampleType: "Serum",
+    standardPrice: 400,
+    parameters: [
+      { id: "typhidot_igm", name: "TYPHI DOT IgM (Salmonella typhi)", unit: "", referenceRange: "NEGATIVE", method: "", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+    ],
+  },
+  {
     code: "CRP",
     name: "C-REACTIVE PROTEIN (CRP)",
     department: "Serology",
@@ -928,6 +948,14 @@ export function getTestParameterSchema(
     baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "CRP");
   }
 
+  // Typhidot is a separate antibody test; without this it falls into the Widal branch via "typhi".
+  const isTyphidotQuery =
+    query.includes("typhi dot") || query.includes("typhidot") || query.includes("es154") || query.includes("es155");
+  if (!baseSchema && isTyphidotQuery) {
+    const isIgm = /\bigm\b/.test(query) || query.includes("es155");
+    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === (isIgm ? "ES155" : "ES154"));
+  }
+
   // Specific Blood Glucose tests (FASTING, PP, FASTING AND PP, RANDOM)
   const isGlucoseQuery =
     query.includes("glucose") ||
@@ -1023,6 +1051,11 @@ export function getTestParameterSchema(
     } else if (query.includes("crp") || query.includes("c-reactive") || query.includes("c reactive") || query.includes("reactive protein")) {
       baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "CRP");
     }
+  }
+
+  // Basic and Advance lipid profiles share one parameter template; only the report title differs.
+  if (baseSchema?.code === "LIPID" && query.includes("basic")) {
+    baseSchema = { ...baseSchema, name: "Lipid Profile Basic" };
   }
 
   const resolvedSchema: TestDefinition = baseSchema ?? {
