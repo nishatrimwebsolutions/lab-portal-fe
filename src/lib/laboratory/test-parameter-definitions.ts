@@ -35,6 +35,33 @@ export interface TestDefinition {
   interpretations?: TestInterpretation[];
   remarks?: string[];
   guidelinesRef?: string;
+  /** Prefill the report's clinical notes with this test's interpretations and remarks (lab-supplied wording only). */
+  prefillClinicalNotes?: boolean;
+}
+
+// Wording taken from the lab's reference Typhidot report.
+const TYPHIDOT_CLINICAL_COMMENT =
+  "Detection of S. typhi specific IgM antibodies serves as a marker for early detection of recent infection. However the test should be used as a screening test in clinically suspected cases only, and its result should be confirmed by other supplemental method before taking clinical decisions. In some studies it has been reported that low titer IgM antibodies to S. typhi persist for about 4 months post infection. A negative result does not rule out the recent infection, as the positivity is influenced by the time elapsed from the onset of fever and immunocompetence of the patient. However, if infection is still suspected, repeat the test after 5-7 days. Occasionally high titer rheumatoid factor may result in a false positive reaction.";
+
+const TYPHIDOT_NOTES = [
+  "• Low titre of IgM antibodies to S.typhi may persist for about 4 months post infection in endemic areas",
+  "• All results to be clinically correlated",
+];
+
+/** Test-specific clinical comment and notes, used to prefill the report's clinical notes. */
+export function buildTestClinicalNotes(schema: Pick<TestDefinition, "interpretations" | "remarks">): string {
+  const sections: string[] = [];
+  for (const item of schema.interpretations ?? []) {
+    const lines = [`${item.heading.toUpperCase()}:`, item.content];
+    if (item.table) {
+      lines.push(item.table.headers.join(" | "), ...item.table.rows.map((row) => row.join(" | ")));
+    }
+    sections.push(lines.join("\n"));
+  }
+  if (schema.remarks?.length) {
+    sections.push(["NOTE:", ...schema.remarks].join("\n"));
+  }
+  return sections.join("\n\n");
 }
 
 export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
@@ -449,8 +476,11 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     sampleType: "Serum",
     standardPrice: 400,
     parameters: [
-      { id: "typhidot_igg", name: "TYPHI DOT IgG (Salmonella typhi)", unit: "", referenceRange: "NEGATIVE", method: "", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+      { id: "typhidot_igg", name: "Salmonella typhi IgG (TYPHI DOT)", unit: "", referenceRange: "NON REACTIVE", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
     ],
+    interpretations: [{ heading: "Clinical Comment", content: TYPHIDOT_CLINICAL_COMMENT }],
+    remarks: TYPHIDOT_NOTES,
+    prefillClinicalNotes: true,
   },
   {
     code: "ES155",
@@ -459,8 +489,11 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     sampleType: "Serum",
     standardPrice: 400,
     parameters: [
-      { id: "typhidot_igm", name: "TYPHI DOT IgM (Salmonella typhi)", unit: "", referenceRange: "NEGATIVE", method: "", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+      { id: "typhidot_igm", name: "Salmonella typhi IgM (TYPHI DOT)", unit: "", referenceRange: "NON REACTIVE", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
     ],
+    interpretations: [{ heading: "Clinical Comment", content: TYPHIDOT_CLINICAL_COMMENT }],
+    remarks: TYPHIDOT_NOTES,
+    prefillClinicalNotes: true,
   },
   {
     code: "CRP",

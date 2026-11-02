@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCatchAllPath } from "@/lib/use-catch-all-path";
 import * as Yup from "yup";
-import { Printer, ArrowLeft, Eye, Edit3, Trash2, Plus, AlertTriangle, Sparkles, FlaskConical, Receipt, FileText, CheckCircle2, X, Calendar, Phone, Mail } from "lucide-react";
+import { Printer, ArrowLeft, Eye, Edit3, Trash2, Plus, AlertTriangle, Sparkles, FlaskConical, Receipt, FileText, CheckCircle2, X, Calendar, Phone, Mail, Download } from "lucide-react";
 import { PageHeader, StatusBadge, Button, Input, Select, Field as UIField, Grid2, Card, cn, SearchableCombobox, ComboboxOption } from "@/components/ui/index";
 import { useAppointment, useAppointments, useCreateAppointment, useCreateInvoice, useDeleteAppointment, useDeleteInvoice, useInvoice, useInvoices, useUpdateAppointment, useUpdateInvoice } from "@/features/operations/hooks";
 import { useTestMasters } from "@/features/test-masters/hooks";
@@ -15,7 +15,8 @@ import { authService } from "@/lib/auth/auth-service";
 import { useFranchise } from "@/lib/context/franchise-context";
 import { formatPatientAgeLabel } from "@/lib/patient-age";
 import { SubParameterSelect } from "@/components/laboratory/SubParameterSelect";
-import type { Appointment, Doctor, Franchise, Invoice, Patient, TestMaster, UserRole } from "@/types/domain";
+import { downloadCsv } from "@/lib/utils/report-export";
+import type { Appointment, Doctor, Franchise, Invoice, InvoiceItem, Patient, TestMaster, UserRole } from "@/types/domain";
 
 const referringDoctorValue = (name: string) => {
   if (!name) return "";
@@ -851,6 +852,39 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
     return { count: rows.length, paid, all };
   }, [filteredList, isAppointment]);
 
+  const handleExportInvoices = () => {
+    const rows = filteredList;
+    downloadCsv(`bills-invoices-${dateRange.from || "all"}-${dateRange.to || "today"}.csv`, [
+      ["Bill No.", "Bill Date", "Patient", "Patient Code", "Referring Doctor", "Franchise", "Tests", "Gross (MRP)", "Discount", "SGST", "CGST", "Price after discount", "Payment Status", ...(canViewCreatedBy ? ["Created By"] : [])],
+      ...rows.map((row) => {
+        let items: unknown = row.items;
+        if (typeof items === "string") {
+          try { items = JSON.parse(items); } catch { items = []; }
+        }
+        const itemList = Array.isArray(items) ? (items as InvoiceItem[]) : [];
+        const gross = itemList.reduce((sum, item) => sum + (Number(item.mrp) || 0) * (Number(item.quantity) || 1), 0);
+        return [
+          row.billNumber || "",
+          row.billDate || recordDateKey(row.createdAt) || "",
+          row.patient?.name || row.patientId || "",
+          row.patient?.patientCode || "",
+          row.doctor?.name || row.patient?.referringDoctor?.name || (row.doctorId && !row.doctorId.startsWith("doc-") && !row.doctorId.includes("-") ? row.doctorId : "Direct / Walk-in"),
+          row.franchise?.name || row.franchise?.code || "Central Lab",
+          itemList.map((item) => item.description).filter(Boolean).join("; "),
+          gross,
+          Number(row.discount) || 0,
+          Number(row.sgst) || 0,
+          Number(row.cgst) || 0,
+          invoicePriceAfterDiscount(row),
+          row.paymentStatus || "",
+          ...(canViewCreatedBy ? [row.addedBy || row.createdBy || "System"] : []),
+        ];
+      }),
+      [],
+      ["Total", "", "", "", "", "", "", "", "", "", "", billingCollection.all, `Paid: ${billingCollection.paid}`],
+    ]);
+  };
+
   const handleDelete = async () => {
     if (!confirmDeleteId || !canDelete) return;
     if (isAppointment) {
@@ -958,9 +992,14 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
               )}
             </div>
 
-            <span className="text-xs font-medium text-[color:var(--muted)]">
-              Showing <b>{filteredList.length}</b> invoice{filteredList.length === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-[color:var(--muted)]">
+                Showing <b>{filteredList.length}</b> invoice{filteredList.length === 1 ? "" : "s"}
+              </span>
+              <Button variant="outline" size="sm" leftIcon={<Download size={14} />} onClick={handleExportInvoices} disabled={!filteredList.length}>
+                Export Excel
+              </Button>
+            </div>
           </div>
         )}
         <div className="overflow-x-auto rounded-[var(--radius)] border border-[color:var(--line)] bg-[color:var(--surface)] p-4 scrollbar-thin">

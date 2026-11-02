@@ -21,6 +21,7 @@ import {
   evaluateParameterFlag,
   crpMaxForPatient,
   ggtLimitsForPatient,
+  buildTestClinicalNotes,
   type ParameterDefinition,
   type TestDefinition
 } from "@/lib/laboratory/test-parameter-definitions";
@@ -362,7 +363,9 @@ export function ReportGeneratorWizard() {
     setParamRanges(initialRanges);
     setSampleType(activeTestSchema.sampleType);
     setComments(
-      clinicalNotesConfig.emptyMode === "dotted-lines" ? "" : (clinicalNotesConfig.defaultText || "")
+      activeTestSchema.prefillClinicalNotes
+        ? buildTestClinicalNotes(activeTestSchema)
+        : clinicalNotesConfig.emptyMode === "dotted-lines" ? "" : (clinicalNotesConfig.defaultText || "")
     );
   }, [activeTestSchema, clinicalNotesConfig]);
 

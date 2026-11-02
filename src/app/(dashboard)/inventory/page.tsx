@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo, useState, useEffect } from "react";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Download, Plus, Trash2 } from "lucide-react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import { PageHeader, StatusBadge, Button, Input, Select, Field as UIField, Grid4, Card } from "@/components/ui/index";
@@ -8,6 +8,7 @@ import { useCreateInventory, useDeleteInventory, useInventory } from "@/features
 import { useEntityList } from "@/features/crud/hooks";
 import { authService } from "@/lib/auth/auth-service";
 import type { Franchise } from "@/types/domain";
+import { downloadCsv } from "@/lib/utils/report-export";
 
 const inventorySchema = Yup.object({
   medicine: Yup.string().trim().required("Item / consumable name is required (. Vacutainer EDTA Tubes 3ml)").min(2, "Name must be at least 2 characters"),
@@ -70,19 +71,43 @@ export default function InventoryPage() {
 
   const lowStockCount = (inventory.data ?? []).filter((item) => item.stockQuantity <= item.reorderLevel).length;
 
+  const handleExport = () => {
+    const items = inventory.data ?? [];
+    downloadCsv(`stock-list-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ["Item Name", "In Stock", "Reorder Level", "Purchase Price", "Sale Price", "Storage Location / Hub", "Batch", "Expiry Date", ...(canViewCreatedBy ? ["Created By"] : []), "Status"],
+      ...items.map((item) => [
+        item.medicine,
+        item.stockQuantity,
+        item.reorderLevel,
+        item.purchasePrice,
+        item.salePrice,
+        item.stockHolder,
+        item.batchNumber,
+        item.expiryDate,
+        ...(canViewCreatedBy ? [item.createdBy || "System"] : []),
+        item.stockQuantity <= item.reorderLevel ? "Low Stock" : "In Stock",
+      ]),
+    ]);
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <PageHeader 
         title="Laboratory Inventory" 
         description="Monitor consumables, reagents, vacutainers, and stock across headquarters and franchise hubs." 
         action={
-          <Button 
-            variant="primary" 
-            leftIcon={<Plus size={16} />}
-            onClick={() => document.getElementById("new-stock")?.scrollIntoView({ behavior: "smooth" })}
-          >
-            Add Stock Item
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" leftIcon={<Download size={16} />} onClick={handleExport} disabled={!inventory.data?.length}>
+              Export Excel
+            </Button>
+            <Button
+              variant="primary"
+              leftIcon={<Plus size={16} />}
+              onClick={() => document.getElementById("new-stock")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              Add Stock Item
+            </Button>
+          </div>
         }
       />
 
