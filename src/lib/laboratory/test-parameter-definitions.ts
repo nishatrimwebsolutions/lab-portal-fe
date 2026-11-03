@@ -48,6 +48,11 @@ const TYPHIDOT_NOTES = [
   "• All results to be clinically correlated",
 ];
 
+export function isTyphidotTest(testNameOrCode: string): boolean {
+  const q = (testNameOrCode || "").toLowerCase();
+  return q.includes("typhi dot") || q.includes("typhidot") || q.includes("es154") || q.includes("es155");
+}
+
 /** Test-specific clinical comment and notes, used to prefill the report's clinical notes. */
 export function buildTestClinicalNotes(schema: Pick<TestDefinition, "interpretations" | "remarks">): string {
   const sections: string[] = [];
@@ -470,30 +475,29 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     ]
   },
   {
-    code: "ES154",
-    name: "TYPHI DOT- IGG : SALMONELLA TYPHI",
+    // The lab reports Typhi Dot IgG and IgM together, whichever of the two is billed.
+    code: "TYPHIDOT",
+    name: "TYPHIDOT- IGM & IGG (SALMONELLA TYPHI)",
     department: "Serology",
     sampleType: "Serum",
     standardPrice: 400,
     parameters: [
       { id: "typhidot_igg", name: "Salmonella typhi IgG (TYPHI DOT)", unit: "", referenceRange: "NON REACTIVE", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+      { id: "typhidot_igm", name: "Salmonella typhi IgM (TYPHI DOT)", unit: "", referenceRange: "NON REACTIVE", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
     ],
     interpretations: [{ heading: "Clinical Comment", content: TYPHIDOT_CLINICAL_COMMENT }],
     remarks: TYPHIDOT_NOTES,
     prefillClinicalNotes: true,
   },
   {
-    code: "ES155",
-    name: "TYPHI DOT- IGM: SALMONELLA TYPHI",
-    department: "Serology",
+    code: "BC035",
+    name: "AMYLASE-SERUM",
+    department: "Biochemistry",
     sampleType: "Serum",
     standardPrice: 400,
     parameters: [
-      { id: "typhidot_igm", name: "Salmonella typhi IgM (TYPHI DOT)", unit: "", referenceRange: "NON REACTIVE", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+      { id: "amylase_serum", name: "AMYLASE-SERUM", unit: "U/L", min: 0, max: 90, referenceRange: "0.0 - 90", method: "", defaultValue: "" },
     ],
-    interpretations: [{ heading: "Clinical Comment", content: TYPHIDOT_CLINICAL_COMMENT }],
-    remarks: TYPHIDOT_NOTES,
-    prefillClinicalNotes: true,
   },
   {
     code: "CRP",
@@ -982,11 +986,13 @@ export function getTestParameterSchema(
   }
 
   // Typhidot is a separate antibody test; without this it falls into the Widal branch via "typhi".
-  const isTyphidotQuery =
-    query.includes("typhi dot") || query.includes("typhidot") || query.includes("es154") || query.includes("es155");
+  const isTyphidotQuery = isTyphidotTest(query);
   if (!baseSchema && isTyphidotQuery) {
-    const isIgm = /\bigm\b/.test(query) || query.includes("es155");
-    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === (isIgm ? "ES155" : "ES154"));
+    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "TYPHIDOT");
+  }
+  // Only serum amylase has a lab-supplied range; fluid (BC033) and urine (BC034) keep the generic form.
+  if (!baseSchema && (query.includes("bc035") || (query.includes("amylase") && query.includes("serum")))) {
+    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "BC035");
   }
 
   // Specific Blood Glucose tests (FASTING, PP, FASTING AND PP, RANDOM)

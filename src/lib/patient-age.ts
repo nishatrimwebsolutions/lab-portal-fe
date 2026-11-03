@@ -59,10 +59,13 @@ export function formatPatientAgeLabel(
     const monthsExact = days / 30;
     if (monthsExact < 12) return formatMonthsLabel(Math.max(monthsExact, 1));
 
-    let years = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) years--;
-    return plural(Math.max(years, 1), "year", "years");
+    let totalMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
+    if (today.getDate() < birthDate.getDate()) totalMonths--;
+    const years = Math.max(Math.floor(totalMonths / 12), 1);
+    const months = Math.max(totalMonths, 12) % 12;
+    // Paediatric ages need the month part (e.g. 1 year 6 months); adults keep whole years.
+    if (years < 5 && months > 0) return `${plural(years, "year", "years")} ${plural(months, "month", "months")}`;
+    return plural(years, "year", "years");
   }
 
   if (fallbackYears === undefined || fallbackYears === null || fallbackYears === "") return "N/A";

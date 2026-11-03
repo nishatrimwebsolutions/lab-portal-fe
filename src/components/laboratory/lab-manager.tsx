@@ -739,7 +739,7 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
                                   <div>
                                     <span className="text-[color:var(--muted)] block">Age & Gender</span>
-                                    <span className="font-semibold text-[color:var(--foreground)]">{selectedPatient.age} yrs · {selectedPatient.sex || "—"}</span>
+                                    <span className="font-semibold text-[color:var(--foreground)]">{formatPatientAgeLabel(selectedPatient.dateOfBirth, selectedPatient.age)} · {selectedPatient.sex || "—"}</span>
                                   </div>
                                   <div>
                                     <span className="text-[color:var(--muted)] block">Contact Phone</span>

@@ -22,6 +22,7 @@ import {
   crpMaxForPatient,
   ggtLimitsForPatient,
   buildTestClinicalNotes,
+  isTyphidotTest,
   type ParameterDefinition,
   type TestDefinition
 } from "@/lib/laboratory/test-parameter-definitions";
@@ -77,7 +78,12 @@ export function ReportGeneratorWizard() {
   }, [rawTestsParam]);
 
   const parsedPrescribedTests = useMemo<string[]>(() => {
-    return prescribedTestItems.map(item => item.name);
+    // Typhi Dot IgG and IgM share one combined report, so a bill with both yields a single pending report.
+    const isTyphidotItem = (item: PrescribedTestItem) => isTyphidotTest(`${item.name} ${item.code ?? ""}`);
+    const firstTyphidot = prescribedTestItems.findIndex(isTyphidotItem);
+    return prescribedTestItems
+      .filter((item, idx) => idx === firstTyphidot || !isTyphidotItem(item))
+      .map(item => item.name);
   }, [prescribedTestItems]);
 
   const isFlowMode = Boolean(initialPatientId || initialPatientCode || parsedPrescribedTests.length > 0);
