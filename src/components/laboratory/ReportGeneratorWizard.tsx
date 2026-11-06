@@ -26,6 +26,7 @@ import {
   type ParameterDefinition,
   type TestDefinition
 } from "@/lib/laboratory/test-parameter-definitions";
+import { applyPatientSexRanges } from "@/lib/laboratory/reference-guide-tests";
 import { SubParameterSelect } from "@/components/laboratory/SubParameterSelect";
 import { resolveClinicalNotesConfig } from "@/lib/laboratory/letterhead-registry";
 import { formatPatientAgeLabel } from "@/lib/patient-age";
@@ -334,8 +335,11 @@ export function ReportGeneratorWizard() {
       .filter(Boolean)
       .join(" ");
     const selectedSubParams = testSubParamsMap[selectedTestName] || testSubParamsMap[testKey] || testSubParamsMap[selectedMaster?.name || ""];
-    return getTestParameterSchema(lookupKey || testKey, selectedSubParams, activeFranchiseId);
-  }, [selectedTestName, customTestName, testSubParamsMap, activeFranchiseId, testMastersQuery.data]);
+    return applyPatientSexRanges(
+      getTestParameterSchema(lookupKey || testKey, selectedSubParams, activeFranchiseId, selectedMaster),
+      currentPatient?.sex
+    );
+  }, [selectedTestName, customTestName, testSubParamsMap, activeFranchiseId, testMastersQuery.data, currentPatient?.sex]);
 
   // Approved interpretation rules (live preview; the backend re-evaluates authoritatively on save)
   const patientFranchiseId =
@@ -1000,6 +1004,14 @@ export function ReportGeneratorWizard() {
                             tabIndex={-1}
                             value={rangeVal}
                             className="text-xs font-mono leading-snug cursor-not-allowed bg-slate-50"
+                          />
+                        ) : !param.referenceRange ? (
+                          // Tests without a configured interval (kit-specific) let staff type the range printed on the kit.
+                          <Input
+                            value={rangeVal}
+                            onChange={(e) => setParamRanges((prev) => ({ ...prev, [param.id]: e.target.value }))}
+                            placeholder="Enter kit reference range"
+                            className="h-8 text-xs font-mono"
                           />
                         ) : (
                           <Input

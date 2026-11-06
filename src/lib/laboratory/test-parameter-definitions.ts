@@ -1,3 +1,6 @@
+import type { TestMaster } from "@/types/domain";
+import { isGenericTemplateTest, resolveGuideTest } from "./reference-guide-tests";
+
 export interface ParameterDefinition {
   id: string;
   name: string;
@@ -13,6 +16,8 @@ export interface ParameterDefinition {
   options?: string[]; // for categorical results like Negative/Positive or Visual color
   isHeading?: boolean;
   isSubItem?: boolean;
+  /** Sex-specific interval; the report narrows it to the patient's sex (applyPatientSexRanges). */
+  sexRanges?: { male: { text: string; min?: number; max?: number }; female: { text: string; min?: number; max?: number } };
   parentHeadingId?: string;
 }
 
@@ -78,22 +83,22 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     standardPrice: 450,
     guidelinesRef: "International Council for Standardization in Haematology (ICSH)",
     parameters: [
-      { id: "hb", name: "HAEMOGLOBIN (Hb)", unit: "GM %", min: 11.0, max: 16.0, referenceRange: "11.0 - 16.0", criticalLow: 7.0, criticalHigh: 20.0, method: "Spectrophotometry", machine: "Horiba Yumizen H1500", defaultValue: "12.1" },
+      { id: "hb", name: "HAEMOGLOBIN (Hb)", unit: "GM %", referenceRange: "Male: 13.0 - 17.0\nFemale: 12.0 - 15.0", sexRanges: { male: { text: "13.0 - 17.0", min: 13.0, max: 17.0 }, female: { text: "12.0 - 15.0", min: 12.0, max: 15.0 } }, criticalLow: 7.0, criticalHigh: 20.0, method: "Spectrophotometry", machine: "Horiba Yumizen H1500", defaultValue: "12.1" },
       { id: "tlc", name: "TLC (Total Leucocyte Count )", unit: "/cu mm", min: 4000, max: 11000, referenceRange: "4000 - 11000", criticalLow: 2000, criticalHigh: 30000, method: "Impedance", machine: "Horiba Yumizen H1500", defaultValue: "5,800" },
       { id: "dlc_heading", name: "DIFFERENTIAL LEUCOCYTE COUNT", unit: "", referenceRange: "HEADING", method: "", defaultValue: "", isHeading: true },
-      { id: "neutrophils", name: "NEUTROPHILS", unit: "%", min: 40, max: 80, referenceRange: "40 - 80", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
-      { id: "lymphocytes", name: "LYMPHOCYTES", unit: "%", min: 20, max: 45, referenceRange: "20 - 45", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
-      { id: "monocytes", name: "MONOCYTES", unit: "%", min: 1, max: 8, referenceRange: "1 - 8", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
+      { id: "neutrophils", name: "NEUTROPHILS", unit: "%", min: 40, max: 75, referenceRange: "40 - 75", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
+      { id: "lymphocytes", name: "LYMPHOCYTES", unit: "%", min: 20, max: 40, referenceRange: "20 - 40", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
+      { id: "monocytes", name: "MONOCYTES", unit: "%", min: 2, max: 10, referenceRange: "2 - 10", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
       { id: "eosinophils", name: "EOSINOPHILS", unit: "%", min: 1, max: 6, referenceRange: "1 - 6", method: "Flow-Cytometry DHSS", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
       { id: "basophils", name: "BASOPHILS", unit: "%", min: 0, max: 1, referenceRange: "0 - 1", method: "Impedance", machine: "Horiba Yumizen H1500", defaultValue: "", isSubItem: true, parentHeadingId: "dlc" },
-      { id: "rbc", name: "R B C (Red Blood Cell Count)", unit: "Millions/cm m", min: 3.5, max: 5.0, referenceRange: "3.5 - 5.0", method: "Impedance", machine: "Horiba Yumizen H1500", defaultValue: "3.92" },
-      { id: "pcv", name: "PCV / HCt (Hematocrit)", unit: "%", min: 34, max: 47, referenceRange: "34 - 47", method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "36.3" },
-      { id: "mcv", name: "M C V (Mean Corp Volume)", unit: "fl", min: 76.0, max: 96.0, referenceRange: "76.0 - 96.0", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "92.6" },
-      { id: "mch", name: "M C H (Mean Corp Hb)", unit: "pg", min: 27.0, max: 32.0, referenceRange: "27.0 - 32.0", method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "30.9" },
-      { id: "mchc", name: "M C H C (Mean Corp Hb Conc)", unit: "g/dl", min: 30.0, max: 35.0, referenceRange: "30.0 - 35.0", method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "33.3" },
+      { id: "rbc", name: "R B C (Red Blood Cell Count)", unit: "Millions/cm m", referenceRange: "Male: 4.5 - 5.9\nFemale: 4.1 - 5.1", sexRanges: { male: { text: "4.5 - 5.9", min: 4.5, max: 5.9 }, female: { text: "4.1 - 5.1", min: 4.1, max: 5.1 } }, method: "Impedance", machine: "Horiba Yumizen H1500", defaultValue: "3.92" },
+      { id: "pcv", name: "PCV / HCt (Hematocrit)", unit: "%", referenceRange: "Male: 40 - 50\nFemale: 36 - 46", sexRanges: { male: { text: "40 - 50", min: 40, max: 50 }, female: { text: "36 - 46", min: 36, max: 46 } }, method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "36.3" },
+      { id: "mcv", name: "M C V (Mean Corp Volume)", unit: "fl", min: 80.0, max: 100.0, referenceRange: "80.0 - 100.0", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "92.6" },
+      { id: "mch", name: "M C H (Mean Corp Hb)", unit: "pg", min: 27.0, max: 33.0, referenceRange: "27.0 - 33.0", method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "30.9" },
+      { id: "mchc", name: "M C H C (Mean Corp Hb Conc)", unit: "g/dl", min: 32.0, max: 36.0, referenceRange: "32.0 - 36.0", method: "Calculated", machine: "Horiba Yumizen H1500", defaultValue: "33.3" },
       { id: "plt", name: "PLATELET COUNT", unit: "/mm", min: 150000, max: 450000, referenceRange: "150000 - 450000", criticalLow: 50000, criticalHigh: 800000, method: "Impedance", machine: "Horiba Yumizen H1500", defaultValue: "1,19,000" },
-      { id: "esr", name: "Erythrocyte Sedimentation Rate (ESR)", unit: "mm/hr", min: 0, max: 15, referenceRange: "0 - 15", method: "Westergren Automated", machine: "Alifax Roller 20", defaultValue: "8" },
-      { id: "rdw_cv", name: "RDW - CV", unit: "%", min: 11.6, max: 14.0, referenceRange: "11.6 - 14.0", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "13.1" },
+      { id: "esr", name: "Erythrocyte Sedimentation Rate (ESR)", unit: "mm/hr", referenceRange: "Male: 0 - 15\nFemale: 0 - 20", sexRanges: { male: { text: "0 - 15", min: 0, max: 15 }, female: { text: "0 - 20", min: 0, max: 20 } }, method: "Westergren Automated", machine: "Alifax Roller 20", defaultValue: "8" },
+      { id: "rdw_cv", name: "RDW - CV", unit: "%", min: 11.5, max: 14.5, referenceRange: "11.5 - 14.5", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "13.1" },
       { id: "rdw_sd", name: "RDW - SD", unit: "fL", min: 39.0, max: 46.0, referenceRange: "39.0 - 46.0", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "42.0" },
     ],
     interpretations: [
@@ -117,9 +122,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     guidelinesRef: "Lipid Association of India (LAI) & NCEP ATP-IV",
     parameters: [
       { id: "chol_total", name: "Total Cholesterol", unit: "mg/dL", min: 0, max: 200, referenceRange: "< 200 Desirable", criticalHigh: 300, method: "CHO-POD (Trac. Abel-Kendall)", machine: "Beckman Coulter AU 5800", defaultValue: "165.0" },
-      { id: "hdl", name: "Serum HDL Cholesterol", unit: "mg/dL", min: 40, max: 60, referenceRange: "40 - 60 Optimal", method: "Direct Enzymatic Immunoinhibition", machine: "Beckman Coulter AU 5800", defaultValue: "48.0" },
+      { id: "hdl", name: "Serum HDL Cholesterol", unit: "mg/dL", referenceRange: "Male: > 40\nFemale: > 50", sexRanges: { male: { text: "> 40", min: 40 }, female: { text: "> 50", min: 50 } }, method: "Direct Enzymatic Immunoinhibition", machine: "Beckman Coulter AU 5800", defaultValue: "48.0" },
       { id: "ldl", name: "LDL Cholesterol Calculated", unit: "mg/dL", min: 0, max: 100, referenceRange: "< 100 Optimal", criticalHigh: 190, method: "Calculated (Friedewald)", machine: "Beckman Coulter AU 5800", defaultValue: "91.4" },
-      { id: "vldl", name: "VLDL Cholesterol Calculated", unit: "mg/dL", min: 0, max: 30, referenceRange: "< 30 Desirable", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "25.6" },
+      { id: "vldl", name: "VLDL Cholesterol Calculated", unit: "mg/dL", min: 5, max: 40, referenceRange: "5 - 40", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "25.6" },
       { id: "triglycerides", name: "Serum Triglycerides", unit: "mg/dL", min: 0, max: 150, referenceRange: "< 150 Desirable", criticalHigh: 500, method: "GPO-POD", machine: "Beckman Coulter AU 5800", defaultValue: "128.0" },
       { id: "chol_hdl_ratio", name: "Total CHOL / HDL Ratio", unit: "Ratio", min: 3.30, max: 4.40, referenceRange: "3.30 - 4.40", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "3.44" },
       { id: "ldl_hdl_ratio", name: "LDL / HDL Cholesterol Ratio", unit: "Ratio", min: 0.5, max: 3.0, referenceRange: "0.5 - 3.0 Low Risk", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "1.90" },
@@ -153,17 +158,17 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     standardPrice: 700,
     guidelinesRef: "American Association for the Study of Liver Diseases (AASLD)",
     parameters: [
-      { id: "bili_total", name: "Serum Bilirubin, (Total)", unit: "mg/dL", min: 0.3, max: 1.2, referenceRange: "0.3 - 1.2", criticalHigh: 5.0, method: "DPD", machine: "Beckman Coulter AU 5800", defaultValue: "0.75" },
-      { id: "bili_direct", name: "Serum Bilirubin, (Direct)", unit: "mg/dL", min: 0.0, max: 0.2, referenceRange: "0.0 - 0.2", method: "DPD", machine: "Beckman Coulter AU 5800", defaultValue: "0.15" },
+      { id: "bili_total", name: "Serum Bilirubin, (Total)", unit: "mg/dL", min: 0.2, max: 1.2, referenceRange: "0.2 - 1.2", criticalHigh: 5.0, method: "DPD", machine: "Beckman Coulter AU 5800", defaultValue: "0.75" },
+      { id: "bili_direct", name: "Serum Bilirubin, (Direct)", unit: "mg/dL", min: 0.0, max: 0.3, referenceRange: "0.0 - 0.3", method: "DPD", machine: "Beckman Coulter AU 5800", defaultValue: "0.15" },
       { id: "bili_indirect", name: "Serum Bilirubin, (Indirect)", unit: "mg/dL", min: 0.0, max: 0.8, referenceRange: "0.0 - 0.8", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "0.60" },
-      { id: "total_protein", name: "Serum Total Protein", unit: "g/dL", min: 6.6, max: 8.3, referenceRange: "6.6 - 8.3", method: "Biuret", machine: "Beckman Coulter AU 5800", defaultValue: "7.30" },
-      { id: "albumin", name: "Serum Albumin", unit: "g/dL", min: 3.5, max: 5.2, referenceRange: "3.5 - 5.2", method: "Bromocresol Green (BCG)", machine: "Beckman Coulter AU 5800", defaultValue: "4.20" },
-      { id: "globulin", name: "Serum Globulin", unit: "g/dL", min: 3.0, max: 4.2, referenceRange: "3.0 - 4.2", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "3.10" },
-      { id: "ag_ratio", name: "Albumin / Globulin Ratio", unit: "Ratio", min: 1.2, max: 2.5, referenceRange: "1.2 - 2.5", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "1.35" },
-      { id: "ast_sgot", name: "Aspartate Aminotransferase (AST/SGOT)", unit: "U/L", min: 3, max: 50, referenceRange: "3 - 50", criticalHigh: 250, method: "UV without P5P", machine: "Beckman Coulter AU 5800", defaultValue: "24.0" },
-      { id: "alt_sgpt", name: "Alanine Aminotransferase (ALT/SGPT)", unit: "U/L", min: 3, max: 50, referenceRange: "3 - 50", criticalHigh: 250, method: "UV without P5P", machine: "Beckman Coulter AU 5800", defaultValue: "22.0" },
-      { id: "alp", name: "Alkaline Phosphatase (ALP)", unit: "U/L", min: 43, max: 115, referenceRange: "43 - 115", method: "AMP Buffer", machine: "Beckman Coulter AU 5800", defaultValue: "76.0" },
-      { id: "ggt", name: "Gamma Glutamyl Transferase (GGT)", unit: "U/L", min: 5, max: 47, referenceRange: "ADULT MALES : 7 - 47 U/L\nADULT FEMALES : 5 - 25 U/L\nNEWBORNS : Up to 5 times adult levels", method: "IFCC", machine: "Beckman Coulter AU 5800", defaultValue: "" },
+      { id: "total_protein", name: "Serum Total Protein", unit: "g/dL", min: 6.0, max: 8.3, referenceRange: "6.0 - 8.3", method: "Biuret", machine: "Beckman Coulter AU 5800", defaultValue: "7.30" },
+      { id: "albumin", name: "Serum Albumin", unit: "g/dL", min: 3.5, max: 5.0, referenceRange: "3.5 - 5.0", method: "Bromocresol Green (BCG)", machine: "Beckman Coulter AU 5800", defaultValue: "4.20" },
+      { id: "globulin", name: "Serum Globulin", unit: "g/dL", min: 2.0, max: 3.5, referenceRange: "2.0 - 3.5", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "3.10" },
+      { id: "ag_ratio", name: "Albumin / Globulin Ratio", unit: "Ratio", min: 1.0, max: 2.2, referenceRange: "1.0 - 2.2", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "1.35" },
+      { id: "ast_sgot", name: "Aspartate Aminotransferase (AST/SGOT)", unit: "U/L", min: 10, max: 40, referenceRange: "10 - 40", criticalHigh: 250, method: "UV without P5P", machine: "Beckman Coulter AU 5800", defaultValue: "24.0" },
+      { id: "alt_sgpt", name: "Alanine Aminotransferase (ALT/SGPT)", unit: "U/L", min: 7, max: 56, referenceRange: "7 - 56", criticalHigh: 250, method: "UV without P5P", machine: "Beckman Coulter AU 5800", defaultValue: "22.0" },
+      { id: "alp", name: "Alkaline Phosphatase (ALP)", unit: "U/L", min: 40, max: 130, referenceRange: "40 - 130", method: "AMP Buffer", machine: "Beckman Coulter AU 5800", defaultValue: "76.0" },
+      { id: "ggt", name: "Gamma Glutamyl Transferase (GGT)", unit: "U/L", min: 5, max: 61, referenceRange: "ADULT MALES : 8 - 61 U/L\nADULT FEMALES : 5 - 36 U/L\nNEWBORNS : Up to 5 times adult levels", method: "IFCC", machine: "Beckman Coulter AU 5800", defaultValue: "" },
     ],
     interpretations: [
       {
@@ -185,15 +190,15 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     guidelinesRef: "Kidney Disease Improving Global Outcomes (KDIGO)",
     parameters: [
       { id: "sugar_r", name: "Random Blood Sugar (Sugar - R)", unit: "mg/dL", min: 70, max: 140, referenceRange: "70 - 140", criticalLow: 50, criticalHigh: 300, method: "Hexokinase", machine: "Beckman Coulter AU 5800", defaultValue: "110.0" },
-      { id: "blood_urea", name: "Blood Urea", unit: "mg/dL", min: 17, max: 43, referenceRange: "17 - 43", criticalHigh: 100, method: "GLDH, Kinetic assay", machine: "Beckman Coulter AU 5800", defaultValue: "26.0" },
-      { id: "creatinine", name: "Serum Creatinine", unit: "mg/dL", min: 0.7, max: 1.4, referenceRange: "0.7 - 1.4", criticalHigh: 4.0, method: "Modified Jaffe, Kinetic", machine: "Beckman Coulter AU 5800", defaultValue: "0.92" },
-      { id: "uric_acid", name: "Serum Uric Acid", unit: "mg/dL", min: 3.5, max: 7.2, referenceRange: "3.5 - 7.2", method: "Uricase PAP", machine: "Beckman Coulter AU 5800", defaultValue: "5.4" },
+      { id: "blood_urea", name: "Blood Urea", unit: "mg/dL", min: 15, max: 40, referenceRange: "15 - 40", criticalHigh: 100, method: "GLDH, Kinetic assay", machine: "Beckman Coulter AU 5800", defaultValue: "26.0" },
+      { id: "creatinine", name: "Serum Creatinine", unit: "mg/dL", referenceRange: "Male: 0.7 - 1.3\nFemale: 0.6 - 1.1", sexRanges: { male: { text: "0.7 - 1.3", min: 0.7, max: 1.3 }, female: { text: "0.6 - 1.1", min: 0.6, max: 1.1 } }, criticalHigh: 4.0, method: "Modified Jaffe, Kinetic", machine: "Beckman Coulter AU 5800", defaultValue: "0.92" },
+      { id: "uric_acid", name: "Serum Uric Acid", unit: "mg/dL", referenceRange: "Male: 3.5 - 7.2\nFemale: 2.6 - 6.0", sexRanges: { male: { text: "3.5 - 7.2", min: 3.5, max: 7.2 }, female: { text: "2.6 - 6.0", min: 2.6, max: 6.0 } }, method: "Uricase PAP", machine: "Beckman Coulter AU 5800", defaultValue: "5.4" },
       { id: "sodium", name: "Serum Sodium (Na+)", unit: "mmol/L", min: 135, max: 145, referenceRange: "135 - 145", criticalLow: 120, criticalHigh: 160, method: "Direct ISE", machine: "Beckman Coulter AU 5800", defaultValue: "140.0" },
       { id: "potassium", name: "Serum Potassium (K+)", unit: "mmol/L", min: 3.5, max: 5.1, referenceRange: "3.5 - 5.1", criticalLow: 2.8, criticalHigh: 6.2, method: "Direct ISE", machine: "Beckman Coulter AU 5800", defaultValue: "4.2" },
       { id: "chloride", name: "Serum Chloride (Cl-)", unit: "mmol/L", min: 98, max: 107, referenceRange: "98 - 107", method: "Direct ISE", machine: "Beckman Coulter AU 5800", defaultValue: "102.0" },
       { id: "egfr", name: "eGFR (Estimated Glomerular Filtration Rate)", unit: "mL/min/1.73m²", min: 90, max: 140, referenceRange: "> 90 Normal", criticalLow: 30, method: "Calculated (CKD-EPI)", machine: "Beckman Coulter AU 5800", defaultValue: "105.0" },
-      { id: "bun", name: "Blood Urea Nitrogen (BUN)", unit: "mg/dL", min: 8, max: 20, referenceRange: "8 - 20", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "12.1" },
-      { id: "calcium", name: "Serum Calcium", unit: "mg/dL", min: 8.8, max: 10.6, referenceRange: "8.8 - 10.6", criticalLow: 6.0, criticalHigh: 13.0, method: "Arsenazo III", machine: "Beckman Coulter AU 5800", defaultValue: "9.5" },
+      { id: "bun", name: "Blood Urea Nitrogen (BUN)", unit: "mg/dL", min: 7, max: 20, referenceRange: "7 - 20", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "12.1" },
+      { id: "calcium", name: "Serum Calcium", unit: "mg/dL", min: 8.5, max: 10.5, referenceRange: "8.5 - 10.5", criticalLow: 6.0, criticalHigh: 13.0, method: "Arsenazo III", machine: "Beckman Coulter AU 5800", defaultValue: "9.5" },
       { id: "phosphorus", name: "Serum Phosphorus", unit: "mg/dL", min: 2.5, max: 4.5, referenceRange: "2.5 - 4.5", method: "Phosphomolybdate Complex", machine: "Beckman Coulter AU 5800", defaultValue: "3.6" },
       { id: "bun_creat_ratio", name: "BUN / Creatinine Ratio", unit: "Ratio", min: 10, max: 20, referenceRange: "10 - 20", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "13.1" },
     ],
@@ -338,9 +343,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     standardPrice: 600,
     guidelinesRef: "American Thyroid Association (ATA)",
     parameters: [
-      { id: "t3", name: "Tri-Iodothyronine (T3, Total)", unit: "ng/mL", min: 0.60, max: 1.81, referenceRange: "0.60 - 1.81", method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "1.15" },
-      { id: "t4", name: "Thyroxine (T4, Total)", unit: "µg/dL", min: 3.2, max: 12.6, referenceRange: "3.2 - 12.6", method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "7.8" },
-      { id: "tsh", name: "Thyroid Stimulating Hormone (TSH) Ultra-sensitive", unit: "µIU/mL", min: 0.55, max: 4.78, referenceRange: "0.55 - 4.78", criticalLow: 0.1, criticalHigh: 20.0, method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "2.10" },
+      { id: "t3", name: "Tri-Iodothyronine (T3, Total)", unit: "ng/mL", min: 0.80, max: 2.00, referenceRange: "0.80 - 2.00", method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "1.15" },
+      { id: "t4", name: "Thyroxine (T4, Total)", unit: "µg/dL", min: 5.0, max: 12.0, referenceRange: "5.0 - 12.0", method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "7.8" },
+      { id: "tsh", name: "Thyroid Stimulating Hormone (TSH) Ultra-sensitive", unit: "µIU/mL", min: 0.4, max: 4.0, referenceRange: "0.4 - 4.0", criticalLow: 0.1, criticalHigh: 20.0, method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "2.10" },
     ],
     interpretations: [
       {
@@ -488,16 +493,6 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     interpretations: [{ heading: "Clinical Comment", content: TYPHIDOT_CLINICAL_COMMENT }],
     remarks: TYPHIDOT_NOTES,
     prefillClinicalNotes: true,
-  },
-  {
-    code: "BC035",
-    name: "AMYLASE-SERUM",
-    department: "Biochemistry",
-    sampleType: "Serum",
-    standardPrice: 400,
-    parameters: [
-      { id: "amylase_serum", name: "AMYLASE-SERUM", unit: "U/L", min: 0, max: 90, referenceRange: "0.0 - 90", method: "", defaultValue: "" },
-    ],
   },
   {
     code: "CRP",
@@ -943,12 +938,42 @@ export function getSubParametersForTest(
 export function getTestParameterSchema(
   testNameOrCode: string,
   selectedSubParams?: string[],
-  franchiseIdentifier?: string | { id?: string; code?: string; name?: string } | null
+  franchiseIdentifier?: string | { id?: string; code?: string; name?: string } | null,
+  master?: Pick<TestMaster, "code" | "name" | "department" | "sampleType" | "unit" | "referenceRange"> | null
 ): TestDefinition {
   const query = (testNameOrCode || "").toLowerCase().trim();
   const isAligarh = isAligarhFranchise(franchiseIdentifier);
+  const displayName = master?.name || testNameOrCode;
 
-  let baseSchema: TestDefinition | undefined;
+  const genericSchema = (): TestDefinition => ({
+    code: master?.code || testNameOrCode.slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, "") || "TEST",
+    name: displayName || "Diagnostic Clinical Test",
+    department: master?.department || "Clinical Pathology",
+    sampleType: master?.sampleType || "Serum / Blood",
+    standardPrice: 350,
+    parameters: [
+      {
+        id: "param_1",
+        name: displayName || "Test Result Parameter",
+        unit: master?.unit || "",
+        referenceRange: master?.referenceRange || "",
+        method: "",
+        defaultValue: "Normal",
+      }
+    ],
+    remarks: [
+      "1. Test analyzed according to standard clinical laboratory operating procedures."
+    ]
+  });
+
+  // Lab reference-guide templates are matched by Test Master code before the keyword heuristics below,
+  // so a single-analyte test (e.g. TSH alone) no longer opens a whole profile.
+  const guideSchema = resolveGuideTest(testNameOrCode);
+  let baseSchema: TestDefinition | undefined = guideSchema
+    ? { ...guideSchema, name: master?.name || guideSchema.name }
+    : isGenericTemplateTest(testNameOrCode)
+    ? genericSchema()
+    : undefined;
   const isMalariaQuery =
     query.includes("malaria") ||
     query.includes("plasmodium") ||
@@ -965,7 +990,7 @@ export function getTestParameterSchema(
     query.includes("reactive protein");
 
   // 1. If Aligarh franchise, search Aligarh-specific catalog first
-  if (isAligarh) {
+  if (isAligarh && !baseSchema) {
     if (query.includes("liver") || query.includes("lft") || query.includes("bilirubin")) {
       baseSchema = ALIGARH_TEST_CATALOG[0]; // LFT
     } else if (query.includes("kidney") || query.includes("kft") || query.includes("renal") || query.includes("rft") || query.includes("creatinine") || query.includes("urea")) {
@@ -989,10 +1014,6 @@ export function getTestParameterSchema(
   const isTyphidotQuery = isTyphidotTest(query);
   if (!baseSchema && isTyphidotQuery) {
     baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "TYPHIDOT");
-  }
-  // Only serum amylase has a lab-supplied range; fluid (BC033) and urine (BC034) keep the generic form.
-  if (!baseSchema && (query.includes("bc035") || (query.includes("amylase") && query.includes("serum")))) {
-    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "BC035");
   }
 
   // Specific Blood Glucose tests (FASTING, PP, FASTING AND PP, RANDOM)
@@ -1097,26 +1118,7 @@ export function getTestParameterSchema(
     baseSchema = { ...baseSchema, name: "Lipid Profile Basic" };
   }
 
-  const resolvedSchema: TestDefinition = baseSchema ?? {
-    code: testNameOrCode.slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, "") || "TEST",
-    name: testNameOrCode || "Diagnostic Clinical Test",
-    department: "Clinical Pathology",
-    sampleType: "Serum / Blood",
-    standardPrice: 350,
-    parameters: [
-      {
-        id: "param_1",
-        name: testNameOrCode || "Test Result Parameter",
-        unit: "mg/dL",
-        referenceRange: "Normal",
-        method: "Automated Clinical Analyzer",
-        defaultValue: "Normal",
-      }
-    ],
-    remarks: [
-      "1. Test analyzed according to standard clinical laboratory operating procedures."
-    ]
-  };
+  const resolvedSchema: TestDefinition = baseSchema ?? genericSchema();
 
   // If selectedSubParams are provided and non-empty, filter parameters accordingly
   // Glucose tests always retain all their respective parameters without sub-parameter selection
@@ -1266,13 +1268,13 @@ export function crpMaxForPatient(patient?: { age?: number; dateOfBirth?: string 
   return 6;
 }
 
-const GGT_MALE = { min: 7, max: 47 };
-const GGT_FEMALE = { min: 5, max: 25 };
+const GGT_MALE = { min: 8, max: 61 };
+const GGT_FEMALE = { min: 5, max: 36 };
 
 /** Sex- and age-stratified GGT limits (U/L) matching the printed LFT card. */
 export function ggtLimitsForPatient(patient?: { age?: number; sex?: string; dateOfBirth?: string } | null): { min: number; max: number } {
   const sex = String(patient?.sex || "").toLowerCase();
-  const adult = sex.startsWith("f") ? GGT_FEMALE : sex.startsWith("m") ? GGT_MALE : { min: 5, max: 47 };
+  const adult = sex.startsWith("f") ? GGT_FEMALE : sex.startsWith("m") ? GGT_MALE : { min: 5, max: 61 };
 
   if (patient?.dateOfBirth) {
     const dob = new Date(patient.dateOfBirth);
