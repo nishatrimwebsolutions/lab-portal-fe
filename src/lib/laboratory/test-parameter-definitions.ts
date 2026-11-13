@@ -38,6 +38,8 @@ export interface TestDefinition {
   standardPrice: number;
   parameters: ParameterDefinition[];
   interpretations?: TestInterpretation[];
+  /** Per-parameter interpretation (lab reference guide wording), keyed by parameter id; only parameters on the report are printed. */
+  parameterInterpretations?: Record<string, string>;
   remarks?: string[];
   guidelinesRef?: string;
   /** Prefill the report's clinical notes with this test's interpretations and remarks (lab-supplied wording only). */
@@ -53,14 +55,122 @@ const TYPHIDOT_NOTES = [
   "• All results to be clinically correlated",
 ];
 
+// Parameter interpretation wording from the lab's master reference guide (BL Diagnostics test report-v2.docx).
+const hl = (high: string, low: string) => `High - ${high}. Low - ${low}.`;
+const GUIDE = {
+  hb: hl("dehydration, erythrocytosis", "anemia, blood loss"),
+  rbc: hl("polycythemia, dehydration", "anemia"),
+  pcv: hl("dehydration, erythrocytosis", "anemia"),
+  mcv: hl("macrocytosis, B12/folate deficiency", "iron deficiency, thalassemia"),
+  mch: hl("often increases with larger RBCs", "iron deficiency, hypochromia"),
+  mchc: hl("certain RBC disorders or analytical interference", "iron deficiency"),
+  rdw: hl("increased variation in RBC size", "usually less clinically significant"),
+  tlc: hl("infection, inflammation, steroids", "viral illness, marrow suppression"),
+  plt: hl("reactive thrombocytosis, inflammation", "thrombocytopenia, medicines, marrow/liver disorders"),
+  neutrophils: hl("bacterial infection, stress, steroids", "viral illness, medicines, marrow disorders"),
+  lymphocytes: hl("some viral infections", "steroids, immunodeficiency, other causes"),
+  monocytes: hl("chronic inflammation, recovery phase", "usually limited significance in isolation"),
+  eosinophils: hl("allergy, asthma, parasitic disease", "often little significance in isolation"),
+  basophils: hl("allergic or inflammatory conditions; sometimes marrow disorders", "usually limited significance"),
+  esr: "Nonspecific inflammation marker.",
+  cholTotal: "High: increased cardiovascular risk in context.",
+  triglycerides: "High: metabolic risk; very high levels increase pancreatitis risk.",
+  hdl: "Low: associated with increased cardiovascular risk.",
+  ldl: "Higher levels may increase atherosclerotic risk; target depends on overall risk.",
+  vldl: "Often estimated from triglycerides; method dependent.",
+  nonHdl: "Measures cholesterol in atherogenic lipoproteins.",
+  cholHdlRatio: "Used as an additional risk marker, not alone for diagnosis.",
+  biliTotal: hl("jaundice, hemolysis, hepatobiliary disease", "usually limited significance"),
+  biliDirect: hl("cholestasis, hepatobiliary disease", "usually limited significance"),
+  biliIndirect: hl("hemolysis or impaired bilirubin conjugation", "usually limited significance"),
+  ast: hl("liver or muscle injury", "usually limited significance"),
+  alt: hl("hepatocellular injury", "usually limited significance"),
+  alp: hl("cholestasis or bone-related conditions", "may occur with certain nutritional deficiencies"),
+  ggt: hl("cholestasis, alcohol exposure, medicines", "usually limited significance"),
+  totalProtein: hl("dehydration, increased immunoglobulins", "reduced production, protein loss or malnutrition"),
+  albumin: hl("dehydration", "liver disease, renal protein loss, inflammation"),
+  globulin: hl("inflammation or increased immunoglobulins", "some immune or protein-loss disorders"),
+  agRatio: "May increase with low globulin; may decrease with low albumin or high globulin.",
+  urea: hl("renal dysfunction, dehydration, increased protein breakdown", "low protein intake or impaired urea production"),
+  bun: hl("renal dysfunction, dehydration", "low protein intake or reduced urea production"),
+  creatinine: hl("reduced kidney filtration; other causes possible", "low muscle mass"),
+  uricAcid: hl("gout risk, renal impairment, medicines", "usually less significant in isolation"),
+  sodium: hl("water deficit or sodium-related disorders", "excess water relative to sodium, fluid loss"),
+  potassium: hl("kidney dysfunction, medicines, hemolysis", "gastrointestinal loss, diuretics"),
+  chloride: hl("fluid or acid-base disturbances", "vomiting or other fluid losses"),
+  calcium: hl("parathyroid or other disorders", "vitamin D deficiency or other disorders"),
+  phosphorus: hl("renal impairment, cell breakdown", "malnutrition or other metabolic causes"),
+  glucoseFasting: "100 - 125 mg/dL: impaired fasting glucose; >= 126 mg/dL: diabetes range.",
+  glucose2h: "140 - 199 mg/dL: impaired glucose tolerance; >= 200 mg/dL: diabetes range.",
+  glucoseRandom: ">= 200 mg/dL with classic symptoms can indicate diabetes.",
+  hba1c: "5.7 - 6.4 %: prediabetes range; >= 6.5 %: diabetes range.",
+  eag: "Approximate average glucose over the preceding 2 - 3 months.",
+  tsh: hl("primary hypothyroidism; sometimes other causes", "hyperthyroidism; pituitary or other causes"),
+  t3: hl("hyperthyroidism in context", "hypothyroidism, severe illness, other causes"),
+  t4: hl("hyperthyroidism or altered binding proteins", "hypothyroidism or altered binding proteins"),
+  bloodGroup: "Identifies ABO blood group.",
+  rh: "Identifies Rh(D) antigen status.",
+  malaria: "Positive result supports malaria detection; microscopy may be required.",
+  widal: "Antibody titres alone are insufficient to confirm enteric fever. Interpret against a locally validated baseline; there is no universal normal titre.",
+} as const;
+
+const GUIDE_DIABETES_NOTE =
+  "In the absence of unequivocal symptomatic hyperglycemia, a diabetes-range result generally requires confirmation.";
+const GUIDE_LIPID_NOTES = [
+  "1. Fasting status of the sample should be stated if known.",
+  "2. LDL/VLDL may be calculated or directly measured, depending on the analyzer and triglyceride concentration.",
+  "3. Treatment targets depend on cardiovascular risk and applicable clinical guidelines; a single LDL target does not apply to every patient.",
+];
+const GUIDE_THYROID_PATTERNS: TestInterpretation = {
+  heading: "Common Patterns (guides, not stand-alone diagnoses)",
+  content: "TSH is commonly the first-line test. FT4 helps classify thyroid dysfunction; T3 can be particularly useful when hyperthyroidism is suspected.",
+  table: {
+    headers: ["TSH", "FT4", "Possible pattern"],
+    rows: [
+      ["High", "Low", "Overt primary hypothyroidism"],
+      ["High", "Normal", "Possible subclinical hypothyroidism"],
+      ["Low", "High", "Possible overt hyperthyroidism"],
+      ["Low", "Normal", "Possible subclinical hyperthyroidism or other causes"],
+      ["Low/normal", "Low", "Consider pituitary causes or severe illness, among others"],
+    ],
+  },
+};
+const GUIDE_THYROID_NOTES = [
+  "1. Exact intervals differ by analyzer and assay. Pregnancy requires trimester- and method-appropriate interpretation.",
+];
+
 export function isTyphidotTest(testNameOrCode: string): boolean {
   const q = (testNameOrCode || "").toLowerCase();
   return q.includes("typhi dot") || q.includes("typhidot") || q.includes("es154") || q.includes("es155");
 }
 
-/** Test-specific clinical comment and notes, used to prefill the report's clinical notes. */
-export function buildTestClinicalNotes(schema: Pick<TestDefinition, "interpretations" | "remarks">): string {
+/** Above this many parameter interpretations only out-of-range parameters are listed, so the report stays on one page. */
+const FULL_PARAMETER_INTERPRETATION_MAX = 8;
+
+/**
+ * Test-specific clinical comment and notes, used to prefill the report's clinical notes.
+ * `flags` maps parameter id to its evaluated flag (High / Low / Critical / Normal ...).
+ */
+export function buildTestClinicalNotes(
+  schema: Pick<TestDefinition, "interpretations" | "remarks" | "parameterInterpretations" | "parameters">,
+  flags: Record<string, string | undefined> = {}
+): string {
   const sections: string[] = [];
+  const interpreted = schema.parameterInterpretations
+    ? schema.parameters.filter((p) => !p.isHeading && schema.parameterInterpretations![p.id])
+    : [];
+  const fullList = interpreted.length <= FULL_PARAMETER_INTERPRETATION_MAX;
+  const listed = fullList ? interpreted : interpreted.filter((p) => ["High", "Low", "Critical"].includes(flags[p.id] ?? ""));
+  const paramLines = listed.map((p) => {
+    const text = schema.parameterInterpretations![p.id];
+    const sides = fullList ? null : /^High - (.*)\. Low - (.*)\.$/.exec(text);
+    const flag = flags[p.id];
+    const shown = sides && flag === "High" ? `High - ${sides[1]}.` : sides && flag === "Low" ? `Low - ${sides[2]}.` : text;
+    return `${p.name}: ${shown}`;
+  });
+  if (paramLines.length) {
+    sections.push(["INTERPRETATION:", ...paramLines].join("\n"));
+  }
   for (const item of schema.interpretations ?? []) {
     const lines = [`${item.heading.toUpperCase()}:`, item.content];
     if (item.table) {
@@ -101,17 +211,12 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "rdw_cv", name: "RDW - CV", unit: "%", min: 11.5, max: 14.5, referenceRange: "11.5 - 14.5", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "13.1" },
       { id: "rdw_sd", name: "RDW - SD", unit: "fL", min: 39.0, max: 46.0, referenceRange: "39.0 - 46.0", method: "Derived from RBC Histogram", machine: "Horiba Yumizen H1500", defaultValue: "42.0" },
     ],
-    interpretations: [
-      {
-        heading: "Clinical Interpretation & Peripheral Smear Remarks",
-        content: "The complete blood count reflects normal erythropoiesis, normocytic normochromic red cells, and adequate platelet distribution. No toxic granulation or atypical leucocytes noted on automated differential review."
-      }
-    ],
-    remarks: [
-      "1. Results verified with automated multi-angle hydrodynamic flow cytometry and impedance measurement.",
-      "2. Clinical correlation recommended for any isolated borderline differentials.",
-      "3. Giant platelets: Absent. Adequate platelet aggregation seen."
-    ]
+    parameterInterpretations: {
+      hb: GUIDE.hb, tlc: GUIDE.tlc, neutrophils: GUIDE.neutrophils, lymphocytes: GUIDE.lymphocytes, monocytes: GUIDE.monocytes,
+      eosinophils: GUIDE.eosinophils, basophils: GUIDE.basophils, rbc: GUIDE.rbc, pcv: GUIDE.pcv, mcv: GUIDE.mcv, mch: GUIDE.mch,
+      mchc: GUIDE.mchc, plt: GUIDE.plt, esr: GUIDE.esr, rdw_cv: GUIDE.rdw,
+    },
+    prefillClinicalNotes: true,
   },
   {
     code: "LIPID",
@@ -130,25 +235,12 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "ldl_hdl_ratio", name: "LDL / HDL Cholesterol Ratio", unit: "Ratio", min: 0.5, max: 3.0, referenceRange: "0.5 - 3.0 Low Risk", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "1.90" },
       { id: "non_hdl", name: "Non-HDL Cholesterol", unit: "mg/dL", min: 0, max: 160, referenceRange: "0 - 160 Desirable", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "117.0" },
     ],
-    interpretations: [
-      {
-        heading: "Cardiovascular Risk Stratification (NCEP ATP IV / LAI)",
-        content: "Optimal lipid targets: LDL-C < 100 mg/dL (Low/Moderate Risk) or < 70 mg/dL (High Risk). Total Cholesterol and Triglycerides within desirable therapeutic thresholds.",
-        table: {
-          headers: ["Risk Category", "Target LDL-C", "Target Non-HDL", "Apo-B"],
-          rows: [
-            ["Low Risk", "< 100 mg/dL", "< 130 mg/dL", "< 90 mg/dL"],
-            ["Moderate Risk", "< 100 mg/dL", "< 130 mg/dL", "< 90 mg/dL"],
-            ["High Risk", "< 70 mg/dL", "< 100 mg/dL", "< 80 mg/dL"],
-            ["Very High Risk", "< 50 mg/dL", "< 80 mg/dL", "< 65 mg/dL"],
-          ]
-        }
-      }
-    ],
-    remarks: [
-      "1. Lipid testing performed following recommended 10-12 hour overnight fasting protocol.",
-      "2. Friedewald calculation is valid when Triglycerides < 400 mg/dL."
-    ]
+    parameterInterpretations: {
+      chol_total: GUIDE.cholTotal, hdl: GUIDE.hdl, ldl: GUIDE.ldl, vldl: GUIDE.vldl, triglycerides: GUIDE.triglycerides,
+      chol_hdl_ratio: GUIDE.cholHdlRatio, non_hdl: GUIDE.nonHdl,
+    },
+    remarks: GUIDE_LIPID_NOTES,
+    prefillClinicalNotes: true,
   },
   {
     code: "LFT",
@@ -170,16 +262,15 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "alp", name: "Alkaline Phosphatase (ALP)", unit: "U/L", min: 40, max: 130, referenceRange: "40 - 130", method: "AMP Buffer", machine: "Beckman Coulter AU 5800", defaultValue: "76.0" },
       { id: "ggt", name: "Gamma Glutamyl Transferase (GGT)", unit: "U/L", min: 5, max: 61, referenceRange: "ADULT MALES : 8 - 61 U/L\nADULT FEMALES : 5 - 36 U/L\nNEWBORNS : Up to 5 times adult levels", method: "IFCC", machine: "Beckman Coulter AU 5800", defaultValue: "" },
     ],
-    interpretations: [
-      {
-        heading: "Hepatic Evaluation & Enzymes",
-        content: "Transaminases (AST/ALT) and excretory enzymes (ALP/GGT) demonstrate preserved hepatocellular integrity with normal protein-synthetic capacity (Albumin/Globulin ratio within normal physiological limits)."
-      }
-    ],
+    parameterInterpretations: {
+      bili_total: GUIDE.biliTotal, bili_direct: GUIDE.biliDirect, bili_indirect: GUIDE.biliIndirect, total_protein: GUIDE.totalProtein,
+      albumin: GUIDE.albumin, globulin: GUIDE.globulin, ag_ratio: GUIDE.agRatio, ast_sgot: GUIDE.ast, alt_sgpt: GUIDE.alt,
+      alp: GUIDE.alp, ggt: GUIDE.ggt,
+    },
     remarks: [
-      "1. Bilirubin is measured by diazo reaction spectrophotometry.",
-      "2. Mild isolated enzyme elevations may occur after vigorous physical exertion or medication."
-    ]
+      "1. AST/ALT indicate enzyme release and possible injury; they do not directly measure the liver's complete functional capacity.",
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "KFT",
@@ -202,26 +293,14 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "phosphorus", name: "Serum Phosphorus", unit: "mg/dL", min: 2.5, max: 4.5, referenceRange: "2.5 - 4.5", method: "Phosphomolybdate Complex", machine: "Beckman Coulter AU 5800", defaultValue: "3.6" },
       { id: "bun_creat_ratio", name: "BUN / Creatinine Ratio", unit: "Ratio", min: 10, max: 20, referenceRange: "10 - 20", method: "Calculated", machine: "Beckman Coulter AU 5800", defaultValue: "13.1" },
     ],
-    interpretations: [
-      {
-        heading: "Renal Function & eGFR Interpretation",
-        content: "Serum creatinine and estimated GFR indicate normal stage 1 renal clearance (> 90 mL/min/1.73m²). Electrolytes and mineral balance are maintained within physiological reference ranges.",
-        table: {
-          headers: ["CKD Stage", "eGFR Range (mL/min/1.73m²)", "Description"],
-          rows: [
-            ["Stage 1", "≥ 90", "Normal / High function"],
-            ["Stage 2", "60 – 89", "Mild reduction"],
-            ["Stage 3a / 3b", "30 – 59", "Moderate reduction"],
-            ["Stage 4", "15 – 29", "Severe reduction"],
-            ["Stage 5", "< 15", "Kidney failure"],
-          ]
-        }
-      }
-    ],
+    parameterInterpretations: {
+      sugar_r: GUIDE.glucoseRandom, blood_urea: GUIDE.urea, creatinine: GUIDE.creatinine, uric_acid: GUIDE.uricAcid, sodium: GUIDE.sodium,
+      potassium: GUIDE.potassium, chloride: GUIDE.chloride, bun: GUIDE.bun, calcium: GUIDE.calcium, phosphorus: GUIDE.phosphorus,
+    },
     remarks: [
-      "1. eGFR calculated using standardized CKD-EPI formula adjusted for adult biological reference ranges.",
-      "2. Adequate hydration recommended prior to subsequent monitoring."
-    ]
+      "1. eGFR is calculated using a validated equation; urine albumin-to-creatinine ratio (ACR) is advised when clinically indicated.",
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "HBA1C",
@@ -234,24 +313,12 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "hba1c", name: "HbA1c (Glycosylated Hemoglobin)", unit: "%", min: 4.2, max: 5.7, referenceRange: "< 5.7 Normal", criticalHigh: 10.0, method: "Ion-Exchange HPLC", machine: "Tosoh G11 Automated Glycohemoglobin Analyzer", defaultValue: "5.4" },
       { id: "eag", name: "Average Estimated Glucose (eAG)", unit: "mg/dL", min: 70, max: 117, referenceRange: "70 - 117", method: "Calculated (28.7 × HbA1c - 46.7)", machine: "Tosoh G11", defaultValue: "108.3" },
     ],
-    interpretations: [
-      {
-        heading: "American Diabetes Association (ADA) Diagnostic Criteria",
-        content: "HbA1c reflects mean glycemic control over the preceding 90–120 days.",
-        table: {
-          headers: ["Diagnostic Category", "HbA1c (%)", "Estimated Avg Glucose (eAG)"],
-          rows: [
-            ["Normal / Non-Diabetic", "< 5.7 %", "< 117 mg/dL"],
-            ["Pre-Diabetes / Impaired Glycemia", "5.7 – 6.4 %", "117 – 137 mg/dL"],
-            ["Diabetes Mellitus", "≥ 6.5 %", "≥ 140 mg/dL"],
-          ]
-        }
-      }
-    ],
+    parameterInterpretations: { hba1c: GUIDE.hba1c, eag: GUIDE.eag },
     remarks: [
-      "1. NGSP certified and IFCC traceable High Performance Liquid Chromatography (HPLC).",
-      "2. In cases of hemoglobin variants or hemolytic conditions, alternative glycemic monitoring (fructosamine) should be considered."
-    ]
+      `1. ${GUIDE_DIABETES_NOTE}`,
+      "2. HbA1c can be unreliable in some anemias, hemoglobin variants, recent blood loss/transfusion and altered red-cell turnover.",
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "BC052",
@@ -263,15 +330,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     parameters: [
       { id: "glucose_fasting", name: "GLUCOSE FASTING", unit: "mg/dL", min: 70, max: 100, referenceRange: "70 - 100", criticalLow: 50, criticalHigh: 300, method: "Hexokinase Enzymatic", machine: "Beckman Coulter DXC 700 AU", defaultValue: "88.0" },
     ],
-    interpretations: [
-      {
-        heading: "Fasting Glucose Classification",
-        content: "Normal fasting plasma glucose: 70–100 mg/dL. Impaired fasting glucose (prediabetes): 101–125 mg/dL. Provisional diabetes: ≥ 126 mg/dL."
-      }
-    ],
-    remarks: [
-      "1. Sample drawn in sodium fluoride glycolytic inhibitor tube after 8-10 hour fast."
-    ]
+    parameterInterpretations: { glucose_fasting: GUIDE.glucoseFasting },
+    remarks: [`1. ${GUIDE_DIABETES_NOTE}`],
+    prefillClinicalNotes: true,
   },
   {
     code: "BC053",
@@ -283,15 +344,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     parameters: [
       { id: "glucose_pp", name: "GLUCOSE PP", unit: "mg/dL", min: 70, max: 140, referenceRange: "70 - 140", criticalLow: 50, criticalHigh: 350, method: "Hexokinase Enzymatic", machine: "Beckman Coulter DXC 700 AU", defaultValue: "115.0" },
     ],
-    interpretations: [
-      {
-        heading: "Post Prandial Glucose Classification",
-        content: "Normal 2-hour post prandial plasma glucose: 70–140 mg/dL. Impaired glucose tolerance: 141–199 mg/dL. Provisional diabetes: ≥ 200 mg/dL."
-      }
-    ],
-    remarks: [
-      "1. Sample drawn exactly 2 hours after commencement of meal."
-    ]
+    parameterInterpretations: { glucose_pp: GUIDE.glucose2h },
+    remarks: [`1. ${GUIDE_DIABETES_NOTE}`],
+    prefillClinicalNotes: true,
   },
   {
     code: "BC289",
@@ -304,16 +359,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "glucose_fasting", name: "GLUCOSE FASTING", unit: "mg/dL", min: 70, max: 100, referenceRange: "70 - 100", criticalLow: 50, criticalHigh: 300, method: "Hexokinase Enzymatic", machine: "Beckman Coulter DXC 700 AU", defaultValue: "88.0" },
       { id: "glucose_pp", name: "GLUCOSE PP", unit: "mg/dL", min: 70, max: 140, referenceRange: "70 - 140", criticalLow: 50, criticalHigh: 350, method: "Hexokinase Enzymatic", machine: "Beckman Coulter DXC 700 AU", defaultValue: "115.0" },
     ],
-    interpretations: [
-      {
-        heading: "Glycemic Assessment (Fasting & Post Prandial)",
-        content: "Fasting Normal: 70–100 mg/dL (Prediabetes: 101–125 mg/dL; Diabetes: ≥ 126 mg/dL). Post Prandial Normal: 70–140 mg/dL (Impaired: 141–199 mg/dL; Diabetes: ≥ 200 mg/dL)."
-      }
-    ],
-    remarks: [
-      "1. Fasting sample drawn after 8-10 hours overnight fast.",
-      "2. PP sample collected 2 hours after meal intake."
-    ]
+    parameterInterpretations: { glucose_fasting: GUIDE.glucoseFasting, glucose_pp: GUIDE.glucose2h },
+    remarks: [`1. ${GUIDE_DIABETES_NOTE}`],
+    prefillClinicalNotes: true,
   },
   {
     code: "BC054",
@@ -325,15 +373,9 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     parameters: [
       { id: "glucose_random", name: "GLUCOSE RANDOM", unit: "mg/dL", min: 70, max: 140, referenceRange: "70 - 140", criticalLow: 50, criticalHigh: 350, method: "Hexokinase Enzymatic", machine: "Beckman Coulter DXC 700 AU", defaultValue: "95.0" },
     ],
-    interpretations: [
-      {
-        heading: "Random Blood Glucose Classification",
-        content: "Normal random plasma glucose: 70–140 mg/dL. Diabetes suspect if random plasma glucose ≥ 200 mg/dL in presence of classical symptoms."
-      }
-    ],
-    remarks: [
-      "1. Non-fasting spot blood sample."
-    ]
+    parameterInterpretations: { glucose_random: GUIDE.glucoseRandom },
+    remarks: [`1. ${GUIDE_DIABETES_NOTE}`],
+    prefillClinicalNotes: true,
   },
   {
     code: "THYROID",
@@ -347,24 +389,10 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "t4", name: "Thyroxine (T4, Total)", unit: "µg/dL", min: 5.0, max: 12.0, referenceRange: "5.0 - 12.0", method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "7.8" },
       { id: "tsh", name: "Thyroid Stimulating Hormone (TSH) Ultra-sensitive", unit: "µIU/mL", min: 0.4, max: 4.0, referenceRange: "0.4 - 4.0", criticalLow: 0.1, criticalHigh: 20.0, method: "Chemiluminescence Immunoassay (CLIA)", machine: "Siemens Atellica IM 1600", defaultValue: "2.10" },
     ],
-    interpretations: [
-      {
-        heading: "Thyroid Axis Evaluation",
-        content: "TSH and circulating total thyroid hormone levels demonstrate euthyroid state with intact pituitary-thyroid feedback regulation.",
-        table: {
-          headers: ["Pregnancy Trimester", "TSH Biological Reference Interval (µIU/mL)"],
-          rows: [
-            ["First Trimester", "0.10 – 2.50"],
-            ["Second Trimester", "0.20 – 3.00"],
-            ["Third Trimester", "0.30 – 3.00"],
-          ]
-        }
-      }
-    ],
-    remarks: [
-      "1. Circadian peak of TSH occurs between 2:00 AM – 4:00 AM; basal morning sampling recommended.",
-      "2. Free fractions (FT3/FT4) or anti-TPO antibodies recommended if autoimmune etiology is suspected."
-    ]
+    parameterInterpretations: { t3: GUIDE.t3, t4: GUIDE.t4, tsh: GUIDE.tsh },
+    interpretations: [GUIDE_THYROID_PATTERNS],
+    remarks: GUIDE_THYROID_NOTES,
+    prefillClinicalNotes: true,
   },
   {
     code: "URINE",
@@ -415,15 +443,11 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "k", name: "Serum Potassium (K+)", unit: "mmol/L", min: 3.5, max: 5.1, referenceRange: "3.5 - 5.1", criticalLow: 2.8, criticalHigh: 6.2, method: "Direct Ion Selective Electrode (ISE)", machine: "Roche 9180 Electrolyte Analyzer", defaultValue: "4.2" },
       { id: "cl", name: "Serum Chloride (Cl-)", unit: "mmol/L", min: 101, max: 109, referenceRange: "101 - 109", criticalLow: 80, criticalHigh: 125, method: "Direct Ion Selective Electrode (ISE)", machine: "Roche 9180 Electrolyte Analyzer", defaultValue: "104.0" },
     ],
-    interpretations: [
-      {
-        heading: "Acid-Base & Fluid Balance",
-        content: "Serum sodium, potassium, and chloride concentrations reflect preserved extracellular osmolar and fluid balance."
-      }
-    ],
+    parameterInterpretations: { na: GUIDE.sodium, k: GUIDE.potassium, cl: GUIDE.chloride },
     remarks: [
-      "1. Direct ISE measurement avoids pseudohyponatremia in hyperproteinemic/hyperlipidemic specimens."
-    ]
+      "1. Electrolytes measured by ion-selective electrode (ISE)."
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "WIDAL",
@@ -441,14 +465,15 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     ],
     interpretations: [
       {
-        heading: "Widal Slide Agglutination Interpretation",
-        content: "Titres <1:80 are considered negative. Significant agglutination (typically ≥1:160) with compatible clinical findings may indicate enteric fever. A rising titre on paired sera is more diagnostic than a single reading."
+        heading: "Interpretation",
+        content: GUIDE.widal
       }
     ],
     remarks: [
       "1. Widal slide agglutination performed on serum.",
       "2. Interpret titres in clinical context; vaccination and prior infection may cause residual antibodies."
-    ]
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "MALARIA",
@@ -468,16 +493,12 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
         options: ["Negative", "Positive"],
       },
     ],
-    interpretations: [
-      {
-        heading: "Malaria Antigen / Parasite Report",
-        content: "Rapid immunochromatographic assay for P. falciparum (HRP-2) and P. vivax (pLDH). Correlate with clinical findings and peripheral smear when indicated."
-      }
-    ],
+    parameterInterpretations: { malaria_result: GUIDE.malaria },
     remarks: [
       "1. Negative result does not completely exclude malaria in early infection; repeat if clinically suspected.",
       "2. Positive results should be correlated with clinical presentation and smear microscopy where available."
-    ]
+    ],
+    prefillClinicalNotes: true,
   },
   {
     // The lab reports Typhi Dot IgG and IgM together, whichever of the two is billed.
@@ -551,16 +572,11 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
         options: ["POSITIVE", "NEGATIVE"],
       },
     ],
-    interpretations: [
-      {
-        heading: "Immunohematology & Blood Group Typing",
-        content: "ABO blood grouping and Rh (D) typing performed using monoclonal anti-A, anti-B and anti-D antisera by standard hemagglutination technique."
-      }
-    ],
+    parameterInterpretations: { blood_group: GUIDE.bloodGroup, rh_typing: GUIDE.rh },
     remarks: [
-      "1. Blood group verified with standardized monoclonal agglutination reagents.",
-      "2. Cross-matching is mandatory prior to blood transfusion."
-    ]
+      "1. Cross-matching is mandatory prior to blood transfusion. Never issue blood components based solely on an unverified result."
+    ],
+    prefillClinicalNotes: true,
   }
 ] as const;
 
@@ -608,16 +624,14 @@ export const ALIGARH_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "s_alp", name: "S.ALKALINE PHOSPHATASE", unit: "U/L", min: 37, max: 143, referenceRange: "37 - 143", method: "AMP Buffer", defaultValue: "76.0" },
       { id: "ggt", name: "GGT", unit: "U/L", min: 5, max: 47, referenceRange: "ADULT MALES : 7 - 47 U/L\nADULT FEMALES : 5 - 25 U/L\nNEWBORNS : Up to 5 times adult levels", method: "IFCC", defaultValue: "" },
     ],
-    interpretations: [
-      {
-        heading: "Hepatic Evaluation & Enzymes",
-        content: "Transaminases (AST/ALT) and excretory enzymes demonstrate preserved hepatocellular integrity."
-      }
-    ],
+    parameterInterpretations: {
+      s_bili_total: GUIDE.biliTotal, bili_conj_direct: GUIDE.biliDirect, bili_unconj_indirect: GUIDE.biliIndirect,
+      ast_sgot: GUIDE.ast, alt_sgpt: GUIDE.alt, s_alp: GUIDE.alp, ggt: GUIDE.ggt,
+    },
     remarks: [
-      "1. Bilirubin is measured by diazo reaction spectrophotometry.",
-      "2. Mild isolated enzyme elevations may occur after vigorous physical exertion or medication."
-    ]
+      "1. AST/ALT indicate enzyme release and possible injury; they do not directly measure the liver's complete functional capacity.",
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "RFT",
@@ -634,16 +648,14 @@ export const ALIGARH_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "s_potassium", name: "S. Potassium", unit: "mmol /L", min: 3.5, max: 5.5, referenceRange: "3.5 - 5.5", method: "Direct ISE", defaultValue: "4.2" },
       { id: "ionised_calcium", name: "IONISED CALCIUM", unit: "meq /L", min: 1.0, max: 2.3, referenceRange: "1.0 - 2.3", method: "Direct ISE / Arsenazo", defaultValue: "1.6" },
     ],
-    interpretations: [
-      {
-        heading: "Renal Function & Electrolyte Interpretation",
-        content: "Serum creatinine, urea and electrolytes demonstrate preserved renal clearance and fluid balance."
-      }
-    ],
+    parameterInterpretations: {
+      blood_urea: GUIDE.urea, serum_creatinine: GUIDE.creatinine, serum_uric_acid: GUIDE.uricAcid,
+      serum_sodium: GUIDE.sodium, s_potassium: GUIDE.potassium,
+    },
     remarks: [
       "1. Renal parameters measured by automated biochemical analyzer.",
-      "2. Adequate hydration recommended prior to subsequent monitoring."
-    ]
+    ],
+    prefillClinicalNotes: true,
   },
   {
     code: "LIPID",
@@ -660,16 +672,12 @@ export const ALIGARH_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "ldl_cholesterol", name: "LDL CHOLESTEROL", unit: "mg%", min: 50.0, max: 190.0, referenceRange: "50.0 - 190.0", method: "Calculated (Friedewald)", defaultValue: "91.4" },
       { id: "total_hdl_ratio", name: "TOTAL / HDL CHOLESTEROL RATIO", unit: "", min: 0.00, max: 4.9, referenceRange: "0.00 - 4.9", method: "Calculated", defaultValue: "3.44" },
     ],
-    interpretations: [
-      {
-        heading: "Cardiovascular Risk Stratification (NCEP ATP IV / LAI)",
-        content: "Total Cholesterol and Triglycerides within desirable therapeutic thresholds."
-      }
-    ],
-    remarks: [
-      "1. Lipid testing performed following recommended 10-12 hour overnight fasting protocol.",
-      "2. Friedewald calculation is valid when Triglycerides < 400 mg/dL."
-    ]
+    parameterInterpretations: {
+      s_cholesterol: GUIDE.cholTotal, s_triglycerides: GUIDE.triglycerides, hdl_cholesterol: GUIDE.hdl,
+      vldl_cholesterol: GUIDE.vldl, ldl_cholesterol: GUIDE.ldl, total_hdl_ratio: GUIDE.cholHdlRatio,
+    },
+    remarks: GUIDE_LIPID_NOTES,
+    prefillClinicalNotes: true,
   },
   {
     code: "THYROID",
@@ -683,16 +691,10 @@ export const ALIGARH_TEST_CATALOG: readonly TestDefinition[] = [
       { id: "t4", name: "T4", unit: "nmol/l", min: 60, max: 155, referenceRange: "60 - 155", method: "Chemiluminescence Immunoassay (CLIA)", defaultValue: "95.0" },
       { id: "tsh", name: "TSH", unit: "ulU/ml", min: 0.38, max: 5.50, referenceRange: "0.38 - 5.50", method: "Chemiluminescence Immunoassay (CLIA)", defaultValue: "2.10" },
     ],
-    interpretations: [
-      {
-        heading: "Thyroid Axis Evaluation",
-        content: "TSH and circulating thyroid hormone levels demonstrate euthyroid state with intact pituitary-thyroid feedback regulation."
-      }
-    ],
-    remarks: [
-      "1. Basal morning sampling recommended.",
-      "2. Clinical correlation advised for borderline results."
-    ]
+    parameterInterpretations: { t3: GUIDE.t3, t4: GUIDE.t4, tsh: GUIDE.tsh },
+    interpretations: [GUIDE_THYROID_PATTERNS],
+    remarks: GUIDE_THYROID_NOTES,
+    prefillClinicalNotes: true,
   }
 ];
 

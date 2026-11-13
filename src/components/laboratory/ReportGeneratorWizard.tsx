@@ -145,6 +145,7 @@ export function ReportGeneratorWizard() {
   const [reportStatus, setReportStatus] = useState<"Draft" | "Pending Review" | "Approved">("Approved");
   const [pathologist, setPathologist] = useState("Dr. Namrata, MBBS, MD(Pathology)");
   const [comments, setComments] = useState("");
+  const [commentsEdited, setCommentsEdited] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -372,12 +373,43 @@ export function ReportGeneratorWizard() {
     setParamUnits(initialUnits);
     setParamRanges(initialRanges);
     setSampleType(activeTestSchema.sampleType);
+    setCommentsEdited(false);
     setComments(
       activeTestSchema.prefillClinicalNotes
         ? buildTestClinicalNotes(activeTestSchema)
         : clinicalNotesConfig.emptyMode === "dotted-lines" ? "" : (clinicalNotesConfig.defaultText || "")
     );
   }, [activeTestSchema, clinicalNotesConfig]);
+
+  // Long profiles list only out-of-range parameters, so refresh the prefilled notes as values are entered
+  // until the user edits the notes by hand.
+  const paramFlagsKey = activeTestSchema.parameterInterpretations
+    ? JSON.stringify(
+        Object.fromEntries(
+          activeTestSchema.parameters
+            .filter((p) => !p.isHeading && activeTestSchema.parameterInterpretations?.[p.id])
+            .map((p) => {
+              const val = paramValues[p.id] ?? "";
+              const evalParam =
+                p.id === "crp"
+                  ? { ...p, max: crpMaxForPatient(currentPatient) }
+                  : p.id === "ggt"
+                  ? { ...p, ...ggtLimitsForPatient(currentPatient) }
+                  : p;
+              const interp = interpretParam(p, val, paramUnits[p.id] ?? p.unit ?? "");
+              const flag = interp ? (interp.isAbnormal ? interp.flag : "Normal") : val.trim() ? evaluateParameterFlag(val, evalParam).flag : undefined;
+              return [p.id, flag];
+            })
+        )
+      )
+    : "";
+  const effectiveComments = useMemo(
+    () =>
+      paramFlagsKey && !commentsEdited && activeTestSchema.prefillClinicalNotes
+        ? buildTestClinicalNotes(activeTestSchema, JSON.parse(paramFlagsKey))
+        : comments,
+    [paramFlagsKey, commentsEdited, activeTestSchema, comments]
+  );
 
   const handleValueChange = (paramId: string, val: string) => {
     setParamValues(prev => ({ ...prev, [paramId]: val }));
@@ -462,7 +494,7 @@ export function ReportGeneratorWizard() {
         department: activeTestSchema.department,
         status: reportStatus,
         pathologist,
-        comments,
+        comments: effectiveComments,
         results: resultsPayload,
         testIds: [activeTestSchema.name],
       };
@@ -1082,8 +1114,11 @@ export function ReportGeneratorWizard() {
           >
             <Textarea
               rows={4}
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
+              value={effectiveComments}
+              onChange={(e) => {
+                setComments(e.target.value);
+                setCommentsEdited(true);
+              }}
               placeholder="Add clinical correlation or pathological notes…"
             />
           </UIField>
