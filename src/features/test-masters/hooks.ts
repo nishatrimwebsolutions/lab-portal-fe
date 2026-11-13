@@ -1,5 +1,5 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { testMasterApi } from "@/mocks/services/resources";
 import type { TestMaster } from "@/types/domain";
 
@@ -23,5 +23,13 @@ export function useTestMaster(idOrCode: string) {
       return (res.data || null) as TestMaster | null;
     },
     enabled: Boolean(idOrCode && idOrCode !== "new"),
+  });
+}
+
+export function useUpdateTestMasterMrp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, mrp }: { id: string; mrp: number }) => testMasterApi.update(id, { mrp }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["test-masters"] }),
   });
 }

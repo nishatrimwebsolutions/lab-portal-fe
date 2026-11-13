@@ -8,7 +8,8 @@ import * as Yup from "yup";
 import { Printer, ArrowLeft, Eye, Edit3, Trash2, Plus, AlertTriangle, Sparkles, FlaskConical, Receipt, FileText, CheckCircle2, X, Calendar, Phone, Mail, Download } from "lucide-react";
 import { PageHeader, StatusBadge, Button, Input, Select, Field as UIField, Grid2, Card, cn, SearchableCombobox, ComboboxOption } from "@/components/ui/index";
 import { useAppointment, useAppointments, useCreateAppointment, useCreateInvoice, useDeleteAppointment, useDeleteInvoice, useInvoice, useInvoices, useUpdateAppointment, useUpdateInvoice } from "@/features/operations/hooks";
-import { useTestMasters } from "@/features/test-masters/hooks";
+import { useTestMasters, useUpdateTestMasterMrp } from "@/features/test-masters/hooks";
+import { TestMrpInput } from "@/components/laboratory/TestMrpInput";
 import { useEntityList } from "@/features/crud/hooks";
 import { useLaboratorySettings } from "@/features/settings/hooks";
 import { authService } from "@/lib/auth/auth-service";
@@ -571,7 +572,7 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
   const [activePrintLayout, setActivePrintLayout] = useState<"a4" | "thermal">("a4");
   const [printModalInvoice, setPrintModalInvoice] = useState<Invoice | null>(null);
   const [proceedToReport, setProceedToReport] = useState(false);
-  const [selectedBillingTests, setSelectedBillingTests] = useState<Array<{ name: string; code: string; mrp: number; rate: number; department?: string; subParameters?: string[] }>>([
+  const [selectedBillingTests, setSelectedBillingTests] = useState<Array<{ name: string; code: string; mrp: number; rate: number; department?: string; subParameters?: string[]; masterId?: string; catalogMrp?: number; saveToCatalog?: boolean }>>([
     { name: "", code: "", mrp: 0, rate: 0, subParameters: [] }
   ]);
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
@@ -612,6 +613,7 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
   const patientsList = useEntityList<Patient>("patients");
   const doctorsList = useEntityList<Doctor>("doctors");
   const testMastersQuery = useTestMasters("", undefined, 2500, effectiveFranchiseId);
+  const updateTestMasterMrp = useUpdateTestMasterMrp();
 
   const printBillDirectly = (layout: "a4" | "thermal") => {
     setActivePrintLayout(layout);
@@ -1393,6 +1395,8 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
           rate: testMaster.rate || testMaster.mrp || 0,
           department: testMaster.department || "",
           subParameters: [],
+          masterId: testMaster.id,
+          catalogMrp: testMaster.mrp || testMaster.rate || 0,
         };
       } else {
         updated[idx] = {
@@ -1419,6 +1423,16 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
         };
         setSelectedBillingTests(updated);
       }
+    };
+
+    const updateBillingTestMrp = (idx: number, mrp: number, setFieldValue: (field: string, value: unknown) => void) => {
+      const updated = selectedBillingTests.map((t, i) => (i === idx ? { ...t, mrp } : t));
+      setSelectedBillingTests(updated);
+      setFieldValue("itemMrp", updated.reduce((sum, t) => sum + (t.mrp || 0), 0));
+    };
+
+    const setBillingTestSaveToCatalog = (idx: number, checked: boolean) => {
+      setSelectedBillingTests(prev => prev.map((t, i) => (i === idx ? { ...t, saveToCatalog: checked } : t)));
     };
 
     const addBillingTest = () => {
@@ -1462,7 +1476,11 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
         } else {
           const v = values as unknown as { billNumber: string; patientId: string; doctorId: string; billDate: string; itemDescription: string; itemQuantity?: number; itemMrp: number; discount?: number; sgst?: number; cgst?: number; paymentStatus: string; addedBy: string; franchiseId?: string };
           const validTests = selectedBillingTests.filter(t => t.name.trim() !== "");
-          const subtotal = validTests.length > 0 
+          if (isAdmin) {
+            const catalogUpdates = validTests.filter(t => t.saveToCatalog && t.masterId && t.mrp !== t.catalogMrp);
+            await Promise.all(catalogUpdates.map(t => updateTestMasterMrp.mutateAsync({ id: t.masterId as string, mrp: t.mrp })));
+          }
+          const subtotal = validTests.length > 0
             ? validTests.reduce((sum, t) => sum + (t.mrp || 0), 0)
             : (Number(v.itemMrp) || 0);
           const discountVal = Number(v.discount) || 0;
@@ -1757,9 +1775,14 @@ export function OperationsManager({ kind, path: pathProp }: Readonly<{ kind: "ap
                                       />
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e8f4f7] border border-[#176b87]/20 text-[#176b87] font-mono text-xs font-bold min-w-[90px] justify-center">
-                                        ₹{Number(testItem.mrp || 0).toFixed(2)}
-                                      </div>
+                                      <TestMrpInput
+                                        mrp={testItem.mrp}
+                                        isAdmin={isAdmin}
+                                        canSaveToCatalog={Boolean(testItem.masterId)}
+                                        saveToCatalog={Boolean(testItem.saveToCatalog)}
+                                        onMrpChange={(mrp) => updateBillingTestMrp(idx, mrp, setFieldValue)}
+                                        onSaveToCatalogChange={(checked) => setBillingTestSaveToCatalog(idx, checked)}
+                                      />
                                       {selectedBillingTests.length > 1 && (
                                         <button
                                           type="button"

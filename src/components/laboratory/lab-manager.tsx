@@ -11,7 +11,8 @@ import { PageHeader, StatusBadge, Button, Input, Select, Textarea, Field as UIFi
 import { DataTable } from "@/components/tables/DataTable";
 import { ResultSection, ResultTable } from "@/components/laboratory/result-engine";
 import { useCreateSample, useCreateTest, useDeleteSample, useDeleteTest, useResults, useSample, useSamples, useTest, useTests, useUpdateSample, useUpdateTest } from "@/features/laboratory/hooks";
-import { useTestMasters } from "@/features/test-masters/hooks";
+import { useTestMasters, useUpdateTestMasterMrp } from "@/features/test-masters/hooks";
+import { TestMrpInput } from "@/components/laboratory/TestMrpInput";
 import { useEntityList } from "@/features/crud/hooks";
 import { authService } from "@/lib/auth/auth-service";
 import { SubParameterSelect } from "@/components/laboratory/SubParameterSelect";
@@ -211,7 +212,7 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
   const [currentRole, setCurrentRole] = useState<UserRole | undefined>(undefined);
   const [currentSession, setCurrentSession] = useState<{ role?: UserRole; franchiseId?: string; id?: string } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [selectedCatalogTests, setSelectedCatalogTests] = useState<Array<{ name: string; code: string; mrp: number; rate: number; department?: string; sampleType?: string; unit?: string; referenceRange?: string; subParameters?: string[] }>>([
+  const [selectedCatalogTests, setSelectedCatalogTests] = useState<Array<{ name: string; code: string; mrp: number; rate: number; department?: string; sampleType?: string; unit?: string; referenceRange?: string; subParameters?: string[]; masterId?: string; catalogMrp?: number; saveToCatalog?: boolean }>>([
     { name: "", code: "", mrp: 0, rate: 0 }
   ]);
 
@@ -300,6 +301,7 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
   const createTest = useCreateTest();
   const updateTest = useUpdateTest();
   const deleteTest = useDeleteTest();
+  const updateTestMasterMrp = useUpdateTestMasterMrp();
 
   const results = useResults();
   
@@ -553,6 +555,8 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
           unit: testMaster.unit || "",
           referenceRange: testMaster.referenceRange || "",
           subParameters: [],
+          masterId: testMaster.id,
+          catalogMrp: testMaster.mrp || testMaster.rate || 0,
         };
       } else {
         updated[idx] = {
@@ -572,6 +576,16 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
       setFieldValue("code", codes || "TEST");
       if (testMaster?.department) setFieldValue("department", testMaster.department);
       if (testMaster?.sampleType) setFieldValue("sampleType", testMaster.sampleType);
+    };
+
+    const updateCatalogTestMrp = (idx: number, mrp: number, setFieldValue: (field: string, value: unknown) => void) => {
+      const updated = selectedCatalogTests.map((t, i) => (i === idx ? { ...t, mrp } : t));
+      setSelectedCatalogTests(updated);
+      setFieldValue("price", updated.reduce((sum, t) => sum + (t.mrp || 0), 0));
+    };
+
+    const setCatalogTestSaveToCatalog = (idx: number, checked: boolean) => {
+      setSelectedCatalogTests(prev => prev.map((t, i) => (i === idx ? { ...t, saveToCatalog: checked } : t)));
     };
 
     const addCatalogTest = () => {
@@ -614,6 +628,10 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
         const totalPrice = validTests.length > 0 
           ? validTests.reduce((sum, t) => sum + (t.mrp || 0), 0)
           : (Number(values.price) || 0);
+        if (isAdmin) {
+          const catalogUpdates = validTests.filter(t => t.saveToCatalog && t.masterId && t.mrp !== t.catalogMrp);
+          await Promise.all(catalogUpdates.map(t => updateTestMasterMrp.mutateAsync({ id: t.masterId as string, mrp: t.mrp })));
+        }
         const compositeName = validTests.length > 0 ? validTests.map(t => t.name).join(", ") : values.name;
         const compositeCode = validTests.length > 0 ? validTests.map(t => t.code).filter(Boolean).join(", ") : values.code;
 
@@ -805,9 +823,14 @@ export function LabManager({ kind, path: pathProp }: Readonly<{ kind: Kind; path
                                       />
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e8f4f7] border border-[#176b87]/20 text-[#176b87] font-mono text-xs font-bold min-w-[90px] justify-center">
-                                        ₹{Number(testItem.mrp || 0).toFixed(2)}
-                                      </div>
+                                      <TestMrpInput
+                                        mrp={testItem.mrp}
+                                        isAdmin={isAdmin}
+                                        canSaveToCatalog={Boolean(testItem.masterId)}
+                                        saveToCatalog={Boolean(testItem.saveToCatalog)}
+                                        onMrpChange={(mrp) => updateCatalogTestMrp(idx, mrp, setFieldValue)}
+                                        onSaveToCatalogChange={(checked) => setCatalogTestSaveToCatalog(idx, checked)}
+                                      />
                                       {selectedCatalogTests.length > 1 && (
                                         <button
                                           type="button"
