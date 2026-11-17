@@ -13,7 +13,7 @@ import { Card, Button, StatusBadge, cn } from "@/components/ui/index";
 import { useDoctorLedger } from "@/features/crud/hooks";
 import { useFranchise } from "@/lib/context/franchise-context";
 import type { DoctorLedgerInvoiceItem } from "@/types/domain";
-import { DoctorAccountLedgerPanel } from "@/components/doctors/DoctorAccountLedger";
+import { DoctorAccountLedgerPanel, DoctorPaymentQuickEntry } from "@/components/doctors/DoctorAccountLedger";
 
 interface DoctorLedgerViewProps {
   doctorId: string;
@@ -439,8 +439,8 @@ export function DoctorLedgerView({
                   <Clock3 size={14} />
                 </div>
                 <div className="mt-2">
-                  <p className="text-xl font-extrabold text-amber-700">₹{summary.totalPending.toLocaleString()}</p>
-                  <p className="text-[10px] text-[color:var(--muted)] mt-0.5">Unsettled Balance</p>
+                  <p className="text-xl font-extrabold text-amber-700">₹{(ledgerReport?.ledger?.closingBalance ?? summary.totalPending).toLocaleString()}</p>
+                  <p className="text-[10px] text-[color:var(--muted)] mt-0.5">Outstanding after payments received</p>
                 </div>
               </div>
 
@@ -479,6 +479,9 @@ export function DoctorLedgerView({
                   <p className="text-[10px] text-[color:var(--muted)] mt-0.5">Per Referral Order</p>
                 </div>
               </div>
+            </div>
+            <div className="mt-3">
+              <DoctorPaymentQuickEntry doctorId={doctorId} ledger={ledgerReport?.ledger} />
             </div>
           </div>
 

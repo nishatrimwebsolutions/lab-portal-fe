@@ -302,6 +302,71 @@ export function DoctorAccountLedgerPanel({ doctor, ledger = EMPTY_LEDGER, startD
   );
 }
 
+export function DoctorPaymentQuickEntry({ doctorId, ledger = EMPTY_LEDGER }: Readonly<{ doctorId: string; ledger?: DoctorAccountLedger }>) {
+  const [canRecordPayment] = useState(() => {
+    const role = authService.getSession()?.role;
+    return Boolean(role && PAYMENT_ROLES.includes(role));
+  });
+  const [paymentDate, setPaymentDate] = useState(() => formatYMD(new Date()));
+  const [amount, setAmount] = useState("");
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [error, setError] = useState("");
+  const createPayment = useCreateDoctorPayment(doctorId);
+  const totalDue = ledger.openingBalance + ledger.totalBilled;
+  const enteredAmount = Number(amount) || 0;
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const value = Number(amount);
+    if (!paymentDate) return setError("Payment date is required.");
+    if (!Number.isFinite(value) || value <= 0) return setError("Enter a valid amount greater than 0.");
+    try {
+      await createPayment.mutateAsync({ paymentDate, amount: value, paymentMode });
+      setAmount("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to record payment.");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3.5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span>Pending Bills: <strong className="font-mono">{formatINR(totalDue)}</strong></span>
+        <span className="text-[color:var(--muted)]">−</span>
+        <span>Payment Received: <strong className="font-mono text-emerald-700">{formatINR(ledger.totalReceived)}</strong></span>
+        <span className="text-[color:var(--muted)]">=</span>
+        <span>Outstanding: <strong className="font-mono text-rose-700 text-sm">{formatINR(ledger.closingBalance)}</strong></span>
+      </div>
+      {canRecordPayment && (
+        <form onSubmit={handleSave} className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold">Amount Received (₹)</span>
+            <input type="number" required min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 10000" className="w-36 rounded border border-[color:var(--line)] bg-white px-2 py-1.5" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold">Date</span>
+            <input type="date" required value={paymentDate} max={formatYMD(new Date())} onChange={(e) => setPaymentDate(e.target.value)} className="rounded border border-[color:var(--line)] bg-white px-2 py-1.5" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-semibold">Mode</span>
+            <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="rounded border border-[color:var(--line)] bg-white px-2 py-1.5">
+              {PAYMENT_MODES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+            </select>
+          </label>
+          <Button type="submit" size="sm" variant="primary" loading={createPayment.isPending}>Save Payment</Button>
+          {enteredAmount > 0 && (
+            <span className="pb-1.5 text-[color:var(--muted)]">
+              Outstanding after this payment: <strong className="font-mono text-[color:var(--foreground)]">{formatINR(ledger.closingBalance - enteredAmount)}</strong>
+            </span>
+          )}
+        </form>
+      )}
+      {error && <p className="mt-2 text-red-600 font-medium">{error}</p>}
+    </div>
+  );
+}
+
 const TONES = {
   slate: "border-slate-200 bg-slate-50 text-slate-700",
   sky: "border-sky-100 bg-sky-50/50 text-sky-800",
