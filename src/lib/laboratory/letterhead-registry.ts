@@ -57,9 +57,9 @@ export const ALIGARH_LETTERHEAD_CONFIG: FranchiseLetterheadConfig = {
   paddingLeft: "36px",
   paddingRight: "48px",
   doctorSignatureArea: {
-    showOverlayDoctorTitle: false, // Dr. Bharat Varshney signature and credentials are pre-printed on the background letterhead
-    doctorName: "DR. BHARAT VARSHNEY",
-    doctorCredentials: "M.B.B.S M.D. (Pathology)",
+    showOverlayDoctorTitle: false, // Dr. Vishakha Sharma signature and credentials are pre-printed on the background letterhead
+    doctorName: "DR. VISHAKHA SHARMA",
+    doctorCredentials: "M.B.B.S D.G.O.",
   },
   footerNoteArea: {
     endOfReportText: "",
