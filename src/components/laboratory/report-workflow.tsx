@@ -473,6 +473,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
   const lab = useLaboratorySettings();
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [withLetterhead, setWithLetterhead] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<UserRole | undefined>(undefined);
 
@@ -612,7 +613,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
           box-shadow: none !important; 
           border-radius: 0 !important; 
           background-color: #ffffff !important;
-          background-image: url('${letterhead.backgroundImage}') !important;
+          background-image: ${withLetterhead ? `url('${letterhead.backgroundImage}')` : "none"} !important;
           background-size: 100% 100% !important;
           background-position: top center !important;
           background-repeat: no-repeat !important;
@@ -752,7 +753,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
           box-shadow: none !important; 
           border-radius: 0 !important; 
           background-color: #ffffff !important;
-          background-image: url('${letterhead.backgroundImage}') !important;
+          background-image: ${withLetterhead ? `url('${letterhead.backgroundImage}')` : "none"} !important;
           background-size: 100% 100% !important;
           background-position: top center !important;
           background-repeat: no-repeat !important;
@@ -962,6 +963,16 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
         </div>
 
         <div className="flex items-center gap-2">
+          <select
+            aria-label="Letterhead"
+            title="Choose Without Letterhead to print on pre-printed letterhead paper"
+            value={withLetterhead ? "with" : "without"}
+            onChange={(e) => setWithLetterhead(e.target.value === "with")}
+            className="h-9 rounded-[var(--radius)] border border-[color:var(--line)] bg-[color:var(--surface)] px-2 text-xs font-semibold text-[color:var(--foreground)]"
+          >
+            <option value="with">With Letterhead</option>
+            <option value="without">Without Letterhead</option>
+          </select>
           <Button
             variant="outline"
             onClick={printReportDirectly}
@@ -1003,7 +1014,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
           className="report-page mx-auto max-w-4xl text-slate-900 border border-slate-300 shadow-lg rounded-xl print:border-0 print:shadow-none print:p-0 print:m-0 print:max-w-none print:w-full font-sans relative"
           style={{
             backgroundColor: "#ffffff",
-            backgroundImage: `url(${letterhead.backgroundImage})`,
+            backgroundImage: withLetterhead ? `url(${letterhead.backgroundImage})` : "none",
             backgroundSize: "100% 100%",
             backgroundPosition: "top center",
             backgroundRepeat: "no-repeat",
@@ -1023,7 +1034,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
           }}
         >
           {/* Explicit Letterhead Background Image (ensures print engine always renders full graphics) */}
-          <img
+          {withLetterhead && (<img
             src={letterhead.backgroundImage}
             alt=""
             aria-hidden="true"
@@ -1038,7 +1049,7 @@ function ReportDetailView({ id }: Readonly<{ id: string }>) {
               zIndex: 0,
               pointerEvents: "none",
             }}
-          />
+          />)}
 
           {/* Dynamic Report Content Area */}
           <div className="space-y-1.5 flex-1 relative" style={{ zIndex: 10, backgroundColor: "transparent" }}>
