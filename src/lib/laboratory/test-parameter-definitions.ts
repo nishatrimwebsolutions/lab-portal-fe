@@ -501,6 +501,23 @@ export const STANDARD_TEST_CATALOG: readonly TestDefinition[] = [
     prefillClinicalNotes: true,
   },
   {
+    // Wording taken from the lab's reference Malaria Vivax & Falciparum antigen report.
+    code: "MALARIA_AG",
+    name: "MALARIA VIVAX AND FALCIPARUM ANTIGEN",
+    department: "Hematology",
+    sampleType: "Whole Blood EDTA",
+    standardPrice: 450,
+    parameters: [
+      { id: "malaria_pv", name: "Plasmodium vivax", unit: "", referenceRange: "Negative", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+      { id: "malaria_pf", name: "Plasmodium falciparum", unit: "", referenceRange: "Negative", method: "Immunochromatography", defaultValue: "", options: ["NEGATIVE", "POSITIVE"] },
+    ],
+    interpretations: [{
+      heading: "Interpretation",
+      content: "Rapid immunochromatographic assay for pLDH antigen. False results can occur; interpret in clinical context and consider thick/thin blood smear microscopy if indicated.",
+    }],
+    prefillClinicalNotes: true,
+  },
+  {
     // The lab reports Typhi Dot IgG and IgM together, whichever of the two is billed.
     code: "TYPHIDOT",
     name: "TYPHIDOT- IGM & IGG (SALMONELLA TYPHI)",
@@ -1006,7 +1023,8 @@ export function getTestParameterSchema(
 
   // 2. Direct match or standard catalog fallback (Varanasi / Default)
   if (!baseSchema && isMalariaQuery) {
-    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "MALARIA");
+    const isMalariaAntigen = query.includes("vivax") || query.includes("falciparum") || query.includes("antigen") || /\bes109\b/.test(query);
+    baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === (isMalariaAntigen ? "MALARIA_AG" : "MALARIA"));
   }
   if (!baseSchema && isCrpQuery) {
     baseSchema = STANDARD_TEST_CATALOG.find((t) => t.code === "CRP");
