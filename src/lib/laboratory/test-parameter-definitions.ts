@@ -1002,6 +1002,10 @@ export function getTestParameterSchema(
     query.includes("mp smear") ||
     query.includes("malaria antigen") ||
     query.includes("malaria card");
+  // Only the routine examination uses the Urine R/M template. Other urine tests (24-hr creatinine, sodium, drug
+  // screens, ...) keep their own name and must not fall into the urine-routine or blood-panel keyword templates.
+  const isUrineRoutine = query === "urine" || (/\burine\b/.test(query) && /routine|\bcue\b|\br\s*\/\s*m\b/.test(query));
+  const isOtherUrineTest = /\burine\b/.test(query) && !isUrineRoutine;
   const isCrpQuery =
     query.includes("crp") ||
     query.includes("c-reactive") ||
@@ -1009,7 +1013,7 @@ export function getTestParameterSchema(
     query.includes("reactive protein");
 
   // 1. If Aligarh franchise, search Aligarh-specific catalog first
-  if (isAligarh && !baseSchema) {
+  if (isAligarh && !baseSchema && !isOtherUrineTest) {
     if (query.includes("liver") || query.includes("lft") || query.includes("bilirubin")) {
       baseSchema = ALIGARH_TEST_CATALOG[0]; // LFT
     } else if (query.includes("kidney") || query.includes("kft") || query.includes("renal") || query.includes("rft") || query.includes("creatinine") || query.includes("urea")) {
@@ -1095,15 +1099,18 @@ export function getTestParameterSchema(
 
   if (!baseSchema) {
     const found = STANDARD_TEST_CATALOG.find(t =>
+      (t.code !== "URINE" || isUrineRoutine) && (
       t.code.toLowerCase() === query ||
       t.name.toLowerCase() === query ||
       t.name.toLowerCase().includes(query) ||
       query.includes(t.code.toLowerCase()) ||
-      query.includes(t.name.toLowerCase())
+      query.includes(t.name.toLowerCase()))
     );
 
     if (found) {
       baseSchema = found;
+    } else if (isOtherUrineTest) {
+      // Falls through to the generic single-result template named after the test.
     } else if (query.includes("group") || query.includes("abo") || query.includes("rh typing") || query.includes("hm009") || query.includes("lshhi302") || (query.includes("blood") && query.includes("rh"))) {
       baseSchema = STANDARD_TEST_CATALOG.find(t => t.code === "HM009" || t.name.includes("BLOOD GROUP")) || STANDARD_TEST_CATALOG[STANDARD_TEST_CATALOG.length - 1];
     } else if (query.includes("cbc") || query.includes("hemogram") || query.includes("haemogram") || query.includes("complete blood count") || query.includes("hm078")) {
@@ -1120,7 +1127,7 @@ export function getTestParameterSchema(
       baseSchema = STANDARD_TEST_CATALOG.find(t => t.code === "HBA1C");
     } else if (query.includes("thyroid") || query.includes("tsh") || query.includes("t3") || query.includes("t4")) {
       baseSchema = STANDARD_TEST_CATALOG.find(t => t.code === "THYROID");
-    } else if (query.includes("urine")) {
+    } else if (isUrineRoutine) {
       baseSchema = STANDARD_TEST_CATALOG.find(t => t.code === "URINE");
     } else if (query.includes("electrolyte") || query.includes("sodium") || query.includes("potassium")) {
       baseSchema = STANDARD_TEST_CATALOG.find(t => t.code === "ELECTROLYTES");
